@@ -1,0 +1,60 @@
+.ixw-grid{
+	font-size:12px;
+	a {color:#fff;}
+	a:hover{text-decoration:none;cursor:pointer;}
+	ul{margin:0;}
+	ul.hdr{background:#396e91;border-bottom: 1px solid transparent;
+		span{color:#fff;}
+		li{ border-right:1px solid #204b67; height:40px;line-height:40px;font-size: 14px;padding-top:0;text-align: left;}
+		.col-_check{text-align: center;}
+	}
+	.body ul{border:1px solid #396e91;border-top:1px solid transparent;}
+	li{display:inline-block;text-align:left;vertical-align:top;height:36px;line-height:36px;padding-left:4px;}
+	.col-task{padding-left:0;}
+	li span.pic-{display:inline-block;width:11px;height:13px;.x-pic;.x-pic-col-sortable;margin:3px 5px 0 2px;}
+	//span.pic-:hover{.x-pic-col-sortable-hover}
+
+	.body {
+		ul:nth-child(even){}
+		ul.hover{
+			background:#1a3e57;border:1px solid #0092b6;margin-top:-1px;padding-top: 1px;
+		}
+		li.col-actions{padding-left:0;}
+	}
+	.col-_no {width:48px;}
+	.col-_check {
+		width:36px!important;text-align:center;
+		.checkbox{
+			width: 12px; height:12px;margin-top:13px;
+			.x-pic;.x-pic-grid-uncheck;
+		}
+		.selected{.x-pic-grid-checked;}
+	}
+	.hdr .col-_check .checkbox{margin-top:13px;}
+	.pic-noGpu{display: inline-block;width:68px;height: 12px !important;.x-pic;.x-pic-no-gpu;margin-left:3px;}
+	.flowSpeed{
+		display: inline-block;padding-right:10px;margin:5px 0;height: 25px;line-height: 25px;vertical-align: top; width:50%;
+		span{width:12px;height: 12px;margin:5px 1px 0px 0;.x-pic;vertical-align: top;}
+		i{font-style: normal; margin-left:2px;}
+		.pic-up{.x-pic-flow-up;}
+		.pic-down{.x-pic-flow-down;}
+	}
+}
+.nodeJobGrid .body, .jobNodeGrid .body, .historyJobNodeGrid .body{
+	.cell{height:auto;}
+	&>ul{border-bottom: 1px solid #ccc;}
+	ul.row>li{height:auto;}
+	ul:nth-child(even){background:#fff;}
+	ul.row.hover{
+		background: #fff;border:0;border-bottom: 1px solid #ccc;
+		&>li{height:auto;}
+	}
+	ul ul{border-left:1px solid #ccc;border-right:1px solid #ccc;border-bottom:1px solid #ccc;}
+	ul.last{border-bottom: 0;}
+}
+.jobNodeGrid .body ul ul{border-right:0;}
+/* .nodeService .body{
+	ul.row:hover{background: #fff;border:0;}
+	ul:nth-child(even):hover{background:#f2f2f2;}
+	a{cursor:default;}
+} */

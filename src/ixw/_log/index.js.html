@@ -1,0 +1,158 @@
+<script>
+	var caller = SDV.Global.logCaller;
+	var userType;
+	var formatDate = SDV.Util.formatDate;
+	var sdvDialog = SDV.Dialog;
+
+	var GridCfgs = {
+		log: {
+			clz: "logGrid",
+			columns: ["_checkbox", "_no", "alarmDetail", "alarmStatus", "alarmDate"],
+			itemPageName: "logs",
+			tools: {
+				type: "log",
+				search: true,
+				dpt: true,
+				buttons: ["mark"],
+				filter: ["status"]
+			}
+		},
+		operation: {
+			clz: "logGrid",
+			columns: ["_no", "optDetail", "optDate"],
+			itemPageName: "logOperation",
+			tools: {
+				type: "operation",
+				search: true,
+				dpt: true
+			}
+		}
+	};
+	var InfoTexts = {
+		log: {
+			listCaller: "getAltLogs"
+		},
+		operation: {
+			listCaller: "getOptLogs"
+		}
+	};
+</script>
+<tpl id="page">
+	<div class="card-switch">
+		<a class="{logClz}" data-href="logs">报警日志</a>
+		<a class="{operationClz}" data-href="log/operation">操作日志</a>
+	</div>
+	<div id="gridTools" class="grid-tools"></div>
+	<div id="gridContainer"></div>
+	<img id="refreshLoading" class="loading" src="{imgUrl}">
+</tpl>
+<script>
+	function switchOut() {}
+
+	function showLog(type, cbFn) {
+		var isUndealAlarm;
+		if(IX.isFn(cbFn)) isUndealAlarm = cbFn();
+		var status = {};
+		var userType = SDV.Env.getUserType();
+		var gridCfg = GridCfgs[type],
+			textInfo = InfoTexts[type];
+		if(type === "log") {
+			gridCfg.tools.buttons = userType ? gridCfg.tools.buttons : [];
+			status = {
+				"status": isUndealAlarm ? 0 : -1
+			};
+		}
+		$X("body").innerHTML = t_page.renderData("", {
+			logClz: type === "log" ? "active" : "",
+			operationClz: type === "log" ? "" : "active",
+			imgUrl: SDV.Global.refreshIntervalUrl
+		});
+		var toDate = new Date().getTime();
+		var dtpDate = {
+			from: (toDate - 90 * 24 * 60 * 60 * 1000),
+			to: toDate
+		};
+		var dtpDateStr = {
+			from: formatDate((toDate - 90 * 24 * 60 * 60 * 1000)),
+			to: formatDate(toDate)
+		};
+		var options = IX.inherit(status, dtpDateStr);
+		var grid = new SDV.Grid.NVGrid(IX.inherit(gridCfg, {
+			container: "gridContainer",
+			dataLoader: function(params, cbFn) {
+				caller(textInfo.listCaller, IX.inherit(params, options), cbFn, function() {
+					switchOut();
+				});
+			},
+			onselect: function() {
+				var arr = IX.loop(grid.getSelectedRows(), [], function(oldAccumulator, data) {
+					if(data.get("status") === 0) oldAccumulator.push(data);
+					return oldAccumulator;
+				});
+				SDV.GridTools.enableTools("gridTools", arr.length);
+			}
+		}));
+		SDV.Grid.currentGrid = {
+			mark: function() {
+				var ids = IX.loop(grid.getSelectedRows(), [], function(acc, log, idx) {
+					if(log.get("status") === 0)
+						acc.push(log.getId());
+					return acc;
+				});
+				if(ids.length) {
+					sdvDialog.confirm("标记报警信息", "确认已处理这些报警了吗？", function(cbFn) {
+						caller("handleAlarms", {
+							ids: ids
+						}, function() {
+							grid.refreshGrid(0);
+							sdvDialog.hide();
+						}, function() {
+							sdvDialog.hide();
+						});
+					});
+				}
+			},
+			"dtp-filter": function() { //时间条
+				IX.iterate(arguments, function(date) {
+					var type = $XP(date, "type", "");
+					var value = $XP(date, "key", "");
+					options[type] = formatDate(value);
+				});
+				grid.refreshGrid(0);
+			},
+			filter: function(_options) { //状态筛选
+				var type = $XP(_options, "type", "status");
+				var value = $XP(_options, "key", "");
+				options[type] = parseInt(value);
+				grid.refreshGrid(0);
+			},
+			search: function(value) {
+				grid.search(value);
+			}
+		};
+		var defaultStatus = isUndealAlarm ? {
+			value: "未处理",
+			type : "status"
+		} : "";
+		SDV.GridTools.showTools("gridTools", gridCfg.tools, IX.inherit(dtpDate, {
+			"defaultData": defaultStatus
+		}));
+		SDV.Env.onResize4Body();
+		grid.show();
+		cbFn();
+	}
+	IX.ns("SDV.Log");
+	SDV.Log.init = function(pageCfg, pageParams, cbFn) {
+		userType = SDV.Env.getUserType();
+		pageCfg.switchOut = switchOut;
+		var pageName = pageCfg.name;
+		switch(pageName) {
+			case "logs":
+				showLog("log", cbFn);
+				break;
+			case "log-operation":
+				showLog("operation", cbFn);
+				break;
+		}
+	};
+</script>

@@ -1,0 +1,288 @@
+<script>
+var caller = SDV.Global.productCaller;
+var showDialog = SDV.Dialog.show;
+var hideDialog = SDV.Dialog.hide;
+var globalActionConfig = IXW.Actions.configActions;
+var dropdownBox = SDV.inputBox.dropdownBox();
+var inputBox = SDV.inputBox.inputBox();
+var uploadedCbHT = new IX.IListManager();
+</script>
+<tpl id="editProduct">
+	<div class="contentRow">
+		<span class="label">产品名称</span>{productHTML}<span class='mark'>*</span>
+	</div>
+	<div class="prompt">1-18个字符 中文 英文 数字 _@/.</div>
+	<div class="contentRow">
+		<span class="label">产品版本</span>{versionHTML}<span class='mark'>*</span>
+	</div>
+	<div class="contentRow">
+		<span class="label">业务属性</span>{attributeHTML}<span class='mark'>*</span>
+	</div>
+</tpl>
+<tpl id="addService">
+<form action="{url}" method="POST" enctype="multipart/form-data" id="product_form" name="product_form" target="product_frame">
+	<div class="contentRow">
+		<span class="label">服务名称</span>{serviceHTML}<span class='mark'>*</span>
+	</div>
+	<div class="prompt">1-18个字符 中文 英文 数字 _@-/.</div>
+	<div class="contentRow">
+		<input type="hidden" id="{id}" name="id" value="{id}">
+		<span class="label">服务镜像</span>
+		<span class="relative_file">
+			<a class="updata_file">选择文件</a>
+			<input type="file" id="imageFile" class="required" name="imageFile">
+			<input type="hidden" name="tkey" value="{tkey}" id="tkey">
+			<span class="txt" id="fileName"></span>
+		</span>
+		<span class='mark'>*</span>
+	</div>
+	<div class="ConfigDetail">{configDetailHTML}</div>
+	<iframe name="product_frame" id="product_frame" style="display:none" src="about:blank"></iframe>
+</form>
+</tpl>
+<tpl id="editService">
+		<div class="contentRow {editStatus}">
+			<span class="label">服务名称</span>{serviceHTML}<span class='mark'>*</span>
+		</div>
+		<div class="prompt {editStatus}">1-18个字符 中文 英文 数字 _@-/.</div>
+		<div class="contentRow {viewStatus}">
+			<span class="label">服务名称</span><span class="viewtxt">{serviceName}</span>
+		</div>
+		<div class="ConfigDetail">{configDetailHTML}</div>
+</tpl>
+<tpl id="ConfigDetail">
+	<div class="contentRow">
+		<span class="label">占用CPU</span>{occupyCpu}核<span class='mark'>*</span><span class="prompt">请输入大于 0 的数值</span>
+	</div>
+	<div class="contentRow">
+		<span class="label">虚拟CPU</span>{virtualCpu}核<span class='mark'>*</span><span class="prompt">请输入大于 0 的数值</span>
+	</div>
+	<div class="contentRow">
+		<span class="label">内存</span>{mem}GB<span class='mark'>*</span><span class="prompt">请输入大于 0 的数值</span>
+	</div>
+	<div class="contentRow">
+		<span class="label">硬盘</span>{disk}GB<span class='mark'>*</span><span class="prompt">请输入大于等于 {min} 的数值</span>
+	</div>
+
+</tpl>
+<script>
+var productCfg = {
+	product : {id : "proname", inputClz : "required textLimit", type : "product"},
+	version : {id : "version", inputClz : "required",type : "version"},
+	service : {id : "servname", inputClz : "required textLimit", type : "service"},
+	occupyCpu : {id : "occupyCpu", inputClz : "required num numLimit",  min : 1},
+	virtualCpu : {id : "virtualCpu", inputClz : "required num numLimit",  min : 1},
+	mem : {id : "occupyMem", inputClz : "required num numLimit",  min : 1},
+	disk : {id : "occupyDisk", inputClz : "required num numLimit",  min : 1},
+	serviceAttr : {id : "serAttr", inputClz : "required"}
+};
+function vertifyRequired(){
+	var flag = true;
+	IX.map(jQuery(".area input.required"), function(el){
+		if(el.value === ""){
+			flag = false;
+		}
+		var lastEl = el;
+		if($XH.hasClass(el.parentNode, "dropdown")){
+			lastEl = $XH.first(el.parentNode, "dropdown-toggle");
+		}
+		$XH[el.value=== "" ? "addClass" : "removeClass"](lastEl, "requiredMark");
+	});
+	IX.map(jQuery(".area input.numLimit"), function(el){
+		if($XH.hasClass(el, "morelimit")) flag = false;
+	});
+	return flag;
+}
+function bindOnValue(areaEl){
+	var inputs = jQuery("input.required");
+	IX.map(inputs, function(el){
+		inputBox.isInputNull(el);
+	});
+	var textLimitInputs = jQuery("input.textLimit");
+	IX.map(textLimitInputs, function(el){
+		inputBox.textLimit(el);
+	});
+	var numInputs = jQuery("input.num");
+	IX.map(numInputs, function(el){
+		inputBox.isNum(el);
+	});
+	var numLimitInputs = jQuery("input.numLimit");
+	IX.map(numLimitInputs, function(el){
+		var quota = parseInt($XD.dataAttr(el, "quota",1));
+		var min = parseInt($XD.dataAttr(el, "min",1));
+		inputBox.numLimit(el,min, quota);
+	});
+}
+function submitProduct(okFn, btndisableFn){
+	var flag = vertifyRequired();
+	if(flag){
+		if(IX.isFn(btndisableFn)) btndisableFn();
+		var name = $X('proname').value;
+		var version = $X('version').value;
+		var serviceAttr = $X('serAttr').value;
+		var productInfo = {
+			name : name,
+			version : version,
+			serviceAttr : serviceAttr
+		};
+		okFn(productInfo);
+	}
+}
+function submitService(tkeyName, cbFn, btndisableFn){
+	var flag = vertifyRequired();
+	if(flag){
+		if(IX.isFn(btndisableFn)) btndisableFn();
+		var formEl = $X('product_form');
+		uploadedCbHT.register(tkeyName, function(retData){
+			switch(retData.retCode){
+				case 0 :
+					hideDialog();
+					SDV.Dialog.alert(retData.err);
+					break;
+				case -1 :
+					SDV.Env.clearSession();
+					break;
+				default :
+					return cbFn(retData.data);
+			}
+		});
+		formEl.submit();
+	}
+}
+function submit4EditProduct(okFn, btndisableFn){
+	var flag = vertifyRequired();
+	if(flag){
+		if(IX.isFn(btndisableFn)) btndisableFn();
+		var name = $X('proname').value;
+		var version = $X('version').value;
+		var serviceAttr = $X('serAttr').value;
+		var productInfo = {
+			name : name,
+			version : version,
+			serviceAttr : serviceAttr
+		};
+		okFn(productInfo);
+	}
+}
+function submit4EditService(okFn, btndisableFn){
+	var flag = vertifyRequired();
+	if(flag){
+		if(IX.isFn(btndisableFn)) btndisableFn();
+		var name = $X('servname').value;
+		var occupyCpu = $X('occupyCpu').value;
+		var virtualCpu = $X('virtualCpu').value;
+		var mem = $X('occupyMem').value;
+		var disk = $X('occupyDisk').value;
+		var serviceInfo = {
+			name : name,
+			occupyCpu : occupyCpu,
+			virtualCpu : virtualCpu,
+			occupyMem : mem,
+			occupyDisk : disk
+		};
+		okFn(serviceInfo);
+	}
+}
+function fileChange(){
+	var fileEl = $X('imageFile');
+	if(!fileEl) return;
+	jQuery(fileEl).bind("change", function(){
+		jQuery("#fileName").html(fileEl.value.split('\\').pop());
+		jQuery("#fileName").attr("title",fileEl.value.split('\\').pop());
+	});
+}
+</script>
+<script>
+
+IX.ns("SDV.productDialog");
+SDV.productDialog.FileUploadedCB = function(tkey, retData){
+	var fn = uploadedCbHT.get(tkey);
+	fn(retData);
+};
+SDV.productDialog.addProduct = function(okFn){
+	caller("getAttributes4Filter",{},function(info){
+		showDialog({
+			title : "添加产品",
+			content : t_editProduct.renderData("", {
+				productHTML : inputBox.getHTML(productCfg.product),
+				versionHTML : inputBox.getHTML(productCfg.version),
+				attributeHTML : dropdownBox.getHTML(productCfg.serviceAttr, IX.loop(info,[],function(acc,item){
+					acc.push(item.name);
+					return acc;
+				}))
+			}),
+			okFn : function(cbFn, btndisableFn){submitProduct(okFn, btndisableFn);},
+			bindOn : function(areaEl){
+				bindOnValue(areaEl, "add");
+			}
+		});
+	});
+};
+SDV.productDialog.editProduct = function(rowModel,okFn){
+	caller("getAttributes4Filter",{},function(info){
+		showDialog({
+			title : "编辑产品",
+			content : t_editProduct.renderData("", {
+				productHTML : inputBox.getHTML(productCfg.product, rowModel.get("name")),
+				versionHTML : inputBox.getHTML(productCfg.version, rowModel.get("version")),
+				attributeHTML : dropdownBox.getHTML(IX.inherit(productCfg.serviceAttr,{value : rowModel.get("serviceAttr")}), 
+				IX.loop(info,[],function(acc,item){
+					acc.push(item.name);
+					return acc;
+				}))
+			}),
+			okFn : function(cbFn, btndisableFn){submit4EditProduct(okFn, btndisableFn);},
+			bindOn : function(areaEl){
+				bindOnValue(areaEl, "edit");
+			}
+		});
+	});
+};
+SDV.productDialog.addService4Product = function(okFn, rowId){
+	var tkeyName = IX.id();
+	showDialog({
+		title : "新建服务",
+		content : t_addService.renderData("", {
+			url : SDV.Global.serviceFileUploadUrl,
+			serviceHTML : inputBox.getHTML(productCfg.service),
+			tkey : tkeyName,
+			id : rowId,
+			configDetailHTML : t_ConfigDetail.renderData("", {
+				occupyCpu : inputBox.getHTML(productCfg.occupyCpu),
+				virtualCpu : inputBox.getHTML(productCfg.virtualCpu),
+				mem : inputBox.getHTML(productCfg.mem),
+				disk : inputBox.getHTML(productCfg.disk),
+				min :1
+			})
+		}),
+		okFn : function(cbFn, btndisableFn){submitService(tkeyName, okFn, btndisableFn);},
+		bindOn : function(areaEl){
+			bindOnValue(areaEl, "add");
+		}
+	});
+	fileChange();
+};
+SDV.productDialog.editService4Product = function(rowModel, okFn, isBase){
+	showDialog({
+		title : "编辑服务",
+		content : t_editService.renderData("", {
+			serviceHTML : inputBox.getHTML(productCfg.service, rowModel.get("name")),
+			editStatus : isBase ? "hide" : "",
+			viewStatus : isBase ? "" : "hide",
+			serviceName : rowModel.get("name"),
+			configDetailHTML : t_ConfigDetail.renderData("", {
+				occupyCpu : inputBox.getHTML(productCfg.occupyCpu, rowModel.get("occupyCpu")),
+				virtualCpu : inputBox.getHTML(productCfg.virtualCpu, rowModel.get("virtualCpu")),
+				mem : inputBox.getHTML(productCfg.mem, rowModel.get("occupyMem")),
+				disk : inputBox.getHTML(productCfg.disk, rowModel.get("occupyDisk"), rowModel.get("occupyDisk")),
+				min : rowModel.get("occupyDisk")
+			})
+		}),
+		okFn : function(cbFn, btndisableFn){submit4EditService(okFn, btndisableFn);},
+		bindOn : function(areaEl){
+			bindOnValue(areaEl, "edit");
+		}
+	});
+};
+
+</script>

@@ -1,0 +1,303 @@
+<tpl id="login">
+	<div class="bg login-bg"><img src="{background}"></div>
+	<div id="c0"></div>
+	<div class="layout" id="layoutbg"><img src="{layoutbg}"></div>
+	<div class="container">
+		<ul id="loginDialog" class="{animationClz}">
+			<li class="title">
+				<div class="light"></div>
+				<div class="text"></div>
+			</li>
+			<ul class="loginInfo"><li>
+				<span class="pic-user"></span>
+				<input type="text" id="account" tabindex="1" >
+				<label id="account-p">请输入用户名</label>
+			</li>
+			<li>
+				<span class="pic-psd"></span>
+				<input type="password" id="password" tabindex="2">
+				<label id="password-p">请输入密码</label>
+			</li>
+			<li class="check">
+				<div id="rememberpw" class="l"><a data-href="$login.rember" data-key="psd"><i class="unchecked"></i><span>记住密码</span></a></div>
+				<div id="autologon" class="r"><a data-href="$login.rember" data-key="auto"><i class="unchecked"></i><span>自动登录</span></a></div>
+			</li>
+			<li class="btn">
+				<a id="submit" tabindex="3" data-href="$login">登录</a>
+			</li></ul>
+			<li class="mouse">
+				<div class="icon-mouseup"><span></span></div>
+				<div class="points">
+					<span class="point1"></span><span class="point2"></span><span class="point3"></span>
+				</div>
+				<div class="icon-mouse"><span></span></div>
+			</li>
+		</ul>
+	</div>
+	<div class="footer">
+		<div class="copy">
+		</div>
+	</div>
+</tpl>
+<script>
+var waveBG = null;
+var windowHalfX = window.innerWidth / 2;
+var windowHalfY = window.innerHeight / 2;
+
+function initParticle( particle, delay ) {
+	particle = this instanceof THREE.Sprite ? this : particle;
+	delay = delay !== undefined ? delay : 0;
+
+	particle.position.set( 0, 0, 0 );
+	particle.scale.x = particle.scale.y = Math.random() * 32 + 16;
+
+	new TWEEN.Tween( particle )
+		.delay( delay )
+		.to( {}, 10000 )
+		.onComplete( initParticle )
+		.start();
+
+	new TWEEN.Tween( particle.position )
+		.delay( delay )
+		.to( { x: Math.random() * 4000 - 2000, y: Math.random() * 1000 - 500, z: Math.random() * 4000 - 2000 }, 10000 )
+		.start();
+
+	new TWEEN.Tween( particle.scale )
+		.delay( delay )
+		.to( { x: 0.01, y: 0.01 }, 10000 )
+		.start();
+}
+function WaveBackground(container){
+	var enabled = true;
+	var mouseX = 0, mouseY = 0;
+	var camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 1, 5000 );
+	camera.position.z = 1000;
+	var scene = new THREE.Scene();
+	var material = new THREE.SpriteMaterial( {
+		map: new THREE.CanvasTexture( generateSprite() ),
+		blending: THREE.AdditiveBlending
+	} );
+	var particle;
+	for ( var i = 0; i < 1000; i++ ) {
+		particle = new THREE.Sprite( material );
+		initParticle( particle, i * 10 );
+		scene.add( particle );
+	}
+
+	var renderer = new THREE.CanvasRenderer();
+	//renderer.setClearColor( 0x000080 );
+	renderer.setClearColor(0x0a2a40,1.0);
+	renderer.setPixelRatio( window.devicePixelRatio );
+	renderer.setSize( window.innerWidth, window.innerHeight );
+	container.appendChild( renderer.domElement );
+	function generateSprite() {
+		var canvas = document.createElement( 'canvas' );
+		canvas.width = 16;
+		canvas.height = 16;
+
+		var context = canvas.getContext( '2d' );
+		var gradient = context.createRadialGradient( canvas.width / 2, canvas.height / 2, 0, canvas.width / 2, canvas.height / 2, canvas.width / 2 );
+		gradient.addColorStop( 0, '#8ef6ff' );
+		gradient.addColorStop( 0.2, '#34c0c5' );
+		gradient.addColorStop( 0.4, 'rgba(0,0,10,1)' );
+		gradient.addColorStop( 1, 'rgba(0,0,0,0.5)' );
+
+		context.fillStyle = gradient;
+		context.fillRect( 0, 0, canvas.width, canvas.height );
+		return canvas;
+	}
+	function animate() {
+		if (!enabled) return;
+		requestAnimationFrame( animate );
+		render();
+	}
+	function render(){
+		TWEEN.update();
+		camera.position.x += ( mouseX - camera.position.x ) * 0.05;
+		camera.position.y += ( - mouseY - camera.position.y ) * 0.05;
+		camera.lookAt( scene.position );
+		renderer.render( scene, camera );
+	}
+	function resize(w,h){
+		windowHalfX = w / 2;
+		windowHalfY = h / 2;
+		camera.aspect = w / h;
+		camera.updateProjectionMatrix();
+		renderer.setSize(w, h);
+	}
+	function move(evt){
+		mouseX = evt.clientX - windowHalfX;
+		mouseY = evt.clientY - windowHalfY;
+	}
+	animate();
+	return {
+		disable : function(){enabled = false;},
+		resize : resize,
+		move : move
+	};
+}
+function saveUserInfoCookie(data){
+	var rememberpw = $XP(data, "rememberpw");
+	var autologon = $XP(data, "autologon");
+	var username = $XP(data, "username");
+	var password = $XP(data, "password");
+	var type = $XP(data, "type", 0);
+	var version = $XP(data, "version", "1.0");
+	var id = $XP(data, "id");
+	if(rememberpw){
+		jQuery.cookie("rememberpw", "true", { expires: 7 });
+		jQuery.cookie("account", username, { expires: 7 });
+		jQuery.cookie("password", password, { expires: 7 });
+		jQuery.cookie("type", type, { expires: 7 });
+		jQuery.cookie("version", version, { expires: 7 });
+		jQuery.cookie("id", type, { expires: 7 });
+	}else{
+		jQuery.cookie("rememberpw", "true");
+		jQuery.cookie("account", username);
+		jQuery.cookie("password", password);
+		jQuery.cookie("type", type);
+		jQuery.cookie("version", version);
+		jQuery.cookie("id", id);
+	}
+	if(autologon){
+		jQuery.cookie("autologon", "true", { expires: 7 });
+	}else{
+		jQuery.cookie("autologon", "true");
+	}
+}
+function clearCookie(){
+	jQuery.cookie("account", "", { expires: -1 });
+	jQuery.cookie("password", "", { expires: -1 });
+	jQuery.cookie("type", "", {expires : -1});
+	jQuery.cookie("version", "", {expires : -1});
+	jQuery.cookie("id", "", {expires : -1});
+	jQuery.cookie("autologon", "false", { expires: -1 });
+	jQuery.cookie("rememberpw", "false", { expires: -1 });
+}
+var ixwPages = IXW.Pages;
+IXW.Actions.configActions([["login", function(){
+	var username = $X('account').value;
+	var password = $X('password').value;
+	var rememberpw = jQuery("#rememberpw i").hasClass("checked");
+	var autologon = jQuery("#autologon i").hasClass("checked");
+	SDV.Global.entryCaller("login", {
+		username :username,
+		password : password
+	}, function(data){
+			saveUserInfoCookie(IX.inherit(data, {username : username, password : password, rememberpw : rememberpw, autologon : autologon}));
+			SDV.Env.resetSession(data);
+			ixwPages.load("");
+	});
+}], ["login.rember", function(params, el){
+	var key = params.key;
+	var checked = jQuery(el).find("i");	
+	if(checked.hasClass("unchecked")){
+		checked.removeClass("unchecked");
+		checked.addClass("checked");
+		if(key === "auto"){
+			var pswChecked = jQuery('#rememberpw i');
+			if(pswChecked.hasClass('unchecked')){
+				pswChecked.removeClass('unchecked');
+				pswChecked.addClass('checked');
+			}
+		}
+	}else{
+		checked.removeClass("checked");
+		checked.addClass("unchecked");
+	}
+}]]);
+function onResize4Body(){
+	var screenY = document.documentElement.clientHeight-80;
+	var height = jQuery("#loginDialog").height();
+	var marginY = Math.round((screenY - 319)/2);
+	jQuery("#loginDialog").css("marginTop" , marginY+"px");
+}
+$Xw.bind({"resize" : function(){
+	if (!waveBG) return;
+	waveBG.resize(window.innerWidth, window.innerHeight);
+}});
+IX.ns("SDV.Entry");
+SDV.Entry.clearCookie = clearCookie;
+SDV.Entry.init = function(pageCfg, pageParams, cbFn){
+	pageCfg.switchOut = function(curContext,nextContext){
+		if (waveBG) waveBG.disable();
+		waveBG = null;
+	};
+	if (SDV.Env.hasSession() /*|| jQuery.cookie("account")*/){
+		/*SDV.Env.resetSession({id :  jQuery.cookie("id"), name : jQuery.cookie("account"), type : jQuery.cookie("type"), version : jQuery.cookie("version")});*/
+		ixwPages.load("");
+		return;
+	}
+	document.body.innerHTML = t_login.renderData("",{
+		background: SDV.Global.backgroundUrl,
+		layoutbg : SDV.Global.layoutbgUrl,
+		animationClz : IX.isChrome ? "animationLogin" : ""
+	});
+	if(jQuery.cookie("rememberpw") == "true"){
+		jQuery("#rememberpw i").removeClass("unchecked");
+		jQuery("#rememberpw i").addClass("checked");
+		$X('account').value = jQuery.cookie("account");
+		$X('password').value = jQuery.cookie("password");
+		jQuery('#account-p').hide();
+		jQuery('#password-p').hide();
+	}
+	if(IX.isChrome){
+		waveBG = new WaveBackground($X('c0'));
+		IX.bind($X('layoutbg'), {
+			"mousemove" : waveBG.move
+		});
+		jQuery("#loginDialog").hover(function(){
+			$XH.addClass(this, "hover");
+		},function(){
+			$XH.removeClass(this, "hover");
+		});
+		jQuery("#loginDialog").bind("click", function(){
+			jQuery("#loginDialog .mouse").addClass("hide");
+			jQuery("#loginDialog .loginInfo").addClass("active");
+			jQuery("#loginDialog .title").addClass("active");
+		});
+	}
+	onResize4Body();
+	$Xw.bind({"resize" : onResize4Body});
+	var aEl = $X("submit");
+	jQuery('#account-p').bind("click",function(){
+		jQuery('#account').focus();
+	});
+	jQuery('#password-p').bind("click",function(){
+		jQuery('#password').focus();
+	});
+
+	jQuery('#account').bind("keydown", function(e){
+		if ( e.which == 13)
+			$X('password').focus();
+	});
+	jQuery('#password').bind("keydown", function(e){
+		if ( e.which == 13)
+			ixwPages.jump(aEl);
+	});
+	jQuery('#account').bind("focus", function(){
+		var liEl = $XD.ancestor($X('account'), "li");
+		$XH.addClass(liEl, "focus");
+		jQuery('#account-p').hide();
+	});
+	jQuery('#account').bind("blur", function(){
+		var liEl = $XD.ancestor($X('account'), "li");
+		$XH.removeClass(liEl, "focus");
+		if(this.value.length === 0){
+			jQuery('#account-p').show();
+		}
+	});
+	jQuery('#password').bind("focus", function(){
+		var liEl = $XD.ancestor($X('password'), "li");
+		$XH.addClass(liEl, "focus");
+		jQuery('#password-p').hide();
+	});
+	jQuery('#password').bind("blur", function(){
+		var liEl = $XD.ancestor($X('password'), "li");
+		$XH.removeClass(liEl, "focus");
+		if(this.value.length === 0){
+			jQuery('#password-p').show();
+		}
+	});
+};
+</script>

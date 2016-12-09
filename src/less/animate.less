@@ -1,0 +1,456 @@
+.x-transform-style(@style) {
+	-webkit-transform-style: @style;
+	-moz-transform-style: @style;
+	-ms-transform-style: @style; // IE9 only
+	transform-style: @style;
+}
+.x-transform-origin(@origin) {
+	-webkit-transform-origin: @origin;
+	-moz-transform-origin: @origin;
+	-ms-transform-origin: @origin; // IE9 only
+	transform-origin: @origin;
+}
+.x-transition(@transition) {
+	-webkit-transition: @transition;
+	-o-transition: @transition;
+	transition: @transition;
+}
+
+.x-transform(@transform) {
+	-webkit-transform: @transform;
+	-ms-transform: @transform; // IE9 only
+	-o-transform: @transform;
+	-moz-transform: @transform;
+ 	transform: @transform;
+}
+.x-animation(@animation) {
+	-webkit-animation: @animation;
+	-moz-animation: @animation;
+	-o-animation: @animation;
+	animation: @animation;
+}
+.x-animation-delay(@time) {
+	-webkit-animation-delay: @time;
+	-moz-animation-delay: @time;
+	-o-animation-delay: @time;
+	animation-delay: @time;
+}
+
+.x-animate-action(@rate){
+	width:percentage(1+@rate/50);
+	height:percentage(1+@rate/50);
+	margin-top:percentage(0-@rate/100);
+	margin-left:percentage(0-@rate/100);
+}
+
+.x-animate-breathe(){
+	0%{.x-animate-action(0);}
+	60%{.x-animate-action(2.4);}
+	100%{.x-animate-action(0);}
+}
+
+@-webkit-keyframes galaxy-breath{
+    .x-animate-breathe;
+}
+@-moz-keyframes auto-circle{
+    .x-animate-breathe;
+}
+@-o-keyframes galaxy-breath{
+    .x-animate-breathe;
+}
+@keyframes galaxy-breath{
+    .x-animate-breathe;
+}
+
+.x-galaxy-breath() {
+	.x-animation(galaxy-breath 8s linear infinite);
+}
+
+.x-animate-bln(){
+	0%{
+		border-color:rgba(14,241,255,0.5);
+		box-shadow: 0px 0px 2px 1px rgba(88,176,255,0.35);}
+	25%{box-shadow: 0px 0px 10px 5px rgba(88,176,255,0.35);}
+	50%{
+		border-color:rgba(100,241,255,1);
+		box-shadow: 0px 0px 20px 10px rgba(88,176,255,0.35);}
+	75%{box-shadow: 0px 0px 10px 5px rgba(88,176,255,0.35);}
+	100%{
+		border-color:rgba(14,241,255,0.5);
+		box-shadow: 0px 0px 2px 1px rgba(88,176,255,0.35);}
+}
+@-webkit-keyframes circle-breath{
+    .x-animate-bln;
+}
+@-moz-keyframes circle-breath{
+    .x-animate-bln;
+}
+@-o-keyframes circle-breath{
+    .x-animate-bln;
+}
+@keyframes circle-breath{
+   .x-animate-bln;
+}
+.x-circle-breath{
+	.x-animation(circle-breath 2s linear infinite);
+}
+.x-circle-breath-stop{
+	.x-animation(circle-breath 0);
+}
+//rof1从集群云存储到视频云存储
+.x-animate-rofs1{
+	0%{left:-16px;top:34px;opacity: 0;}
+	1%{left:-16px;top:34px;opacity: 1;}
+	14%{left:-40px;top:34px;}
+	86%{left:-40px;top:-116px;}
+	100%{left:-16px;top:-116px;}
+}
+@-webkit-keyframes rofs1{
+   .x-animate-rofs1;
+}
+@-moz-keyframes rofs1{
+    .x-animate-rofs1;
+}
+@-o-keyframes rofs1{
+    .x-animate-rofs1;
+}
+@keyframes rofs1{
+   .x-animate-rofs1;
+}
+.x-rofs1{
+	.x-animation(rofs1 1.5s linear infinite);
+}
+//rof2从集群云存储到视频侦查云平台
+.x-animate-rofs2(){
+	0%{left:-16px;top:34px;opacity: 0;}
+	25%{left:-16px;top:34px;opacity: 1;}
+	31%{left:-40px;top:34px;}
+	94%{left:-40px;top:-266px;}
+	100%{left:-16px;top:-266px;}
+}
+@-webkit-keyframes rofs2{
+   .x-animate-rofs2;
+}
+@-moz-keyframes rofs2{
+    .x-animate-rofs2;
+}
+@-o-keyframes rofs2{
+    .x-animate-rofs2;
+}
+@keyframes rofs2{
+   .x-animate-rofs2;
+}
+.x-rofs2{
+	.x-animation(rofs2 4s linear infinite 1s);
+}
+//rofs3从集群云存储到视云实战平台
+.x-animate-rofs3(){
+	// 0%{left:-13px;top:36px;opacity: 0;}
+	// 1%{left:-13px;top:36px;opacity: 1;}
+	// 5%{left:-37px;top:36px;}
+	// 95%{left:-37px;top:-414px;}
+	// 100%{left:-13px;top:-414px;}
+	0%{left:-16px;top:34px;opacity: 0;}
+	30%{left:-16px;top:34px;opacity: 1;}
+	35%{left:-40px;top:34px;}
+	95%{left:-40px;top:-416px;}
+	100%{left:-16px;top:-416px;}
+}
+@-webkit-keyframes rofs3{
+   .x-animate-rofs3;
+}
+@-moz-keyframes rofs3{
+    .x-animate-rofs3;
+}
+@-o-keyframes rofs3{
+    .x-animate-rofs3;
+}
+@keyframes rofs3{
+   .x-animate-rofs3;
+}
+.x-rofs3{
+	.x-animation(rofs3 6s linear infinite);
+}
+//pvg1从视云联网平台到视云实战平台
+.x-animate-pvg1(){
+	0%{left:764px;top:34px;}
+	5%{left:790px;top:34px;}
+	95%{left:790px;top:-416px;}
+	100%{left:764px;top:-416px;}
+}
+@-webkit-keyframes pvg1{
+   .x-animate-pvg1;
+}
+@-moz-keyframes pvg1{
+    .x-animate-pvg1;
+}
+@-o-keyframes pvg1{
+    .x-animate-pvg1;
+}
+@keyframes pvg1{
+   .x-animate-pvg1;
+}
+.x-pvg1{
+	.x-animation(pvg1 5s linear infinite);
+}
+//pvg2从视云联网平台到视频云计算
+.x-animate-pvg2(){
+	0%{left:764px;top:34px;opacity: 0;}
+	30%{left:764px;top:34px;opacity: 1;}
+	44%{left:790px;top:34px;}
+	86%{left:790px;top:-117px;}
+	100%{left:764px;top:-117px;}
+}
+@-webkit-keyframes pvg2{
+   .x-animate-pvg2;
+}
+@-moz-keyframes pvg2{
+    .x-animate-pvg2;
+}
+@-o-keyframes pvg2{
+    .x-animate-pvg2;
+}
+@keyframes pvg2{
+   .x-animate-pvg2;
+}
+.x-pvg2{
+	.x-animation(pvg2 3s linear infinite);
+}
+//pvg3从视云联网平台到社会化运营
+.x-animate-pvg3(){
+	0%{left:764px;top:34px;}
+	5%{left:790px;top:34px;}
+	95%{left:790px;top:-416px;}
+	100%{left:764px;top:-416px;}
+}
+@-webkit-keyframes pvg3{
+   .x-animate-pvg3;
+}
+@-moz-keyframes pvg3{
+    .x-animate-pvg3;
+}
+@-o-keyframes pvg3{
+    .x-animate-pvg3;
+}
+@keyframes pvg3{
+   .x-animate-pvg3;
+}
+.x-pvg3{
+	.x-animation(pvg3 5s linear infinite);
+}
+//pvg4从视云联网平台到物理安防信息管理系统
+.x-animate-pvg4(){
+	0%{left:764px;top:34px;opacity: 0;}
+	5%{left:764px;top:34px;opacity: 1;}
+	/* 9%{left:790px;top:34px;}
+	96%{left:790px;top:-566px;} */
+	100%{left:814px;top:34px;}
+}
+@-webkit-keyframes pvg4{
+   .x-animate-pvg4;
+}
+@-moz-keyframes pvg4{
+    .x-animate-pvg4;
+}
+@-o-keyframes pvg4{
+    .x-animate-pvg4;
+}
+@keyframes pvg4{
+   .x-animate-pvg4;
+}
+.x-pvg4{
+	.x-animation(pvg4 1s linear infinite);
+}
+//pfs1从视频云存储到视频云计算
+.x-animate-pfs1(){
+	0%{left:-16px;top:34px;}
+	100%{left:-65px;top:34px;}
+}
+@-webkit-keyframes pfs1{
+   .x-animate-pfs1;
+}
+@-moz-keyframes pfs1{
+    .x-animate-pfs1;
+}
+@-o-keyframes pfs1{
+    .x-animate-pfs1;
+}
+@keyframes pfs1{
+   .x-animate-pfs1;
+}
+.x-pfs1{
+	.x-animation(pfs1 0.5s linear infinite);
+}
+//pcc1从视频云计算到视频云存储
+.x-animate-pcc1(){
+	0%{.x-pic-pointer4;left:764px;top:34px;}
+	50%{.x-pic-pointer4;left:814px;top:34px;}
+	50.5%{.x-pic-pointer3;left:814px;top:34px;}
+	100%{.x-pic-pointer3;left:764px;top:34px;}
+}
+@-webkit-keyframes pcc1{
+   .x-animate-pcc1;
+}
+@-moz-keyframes pcc1{
+    .x-animate-pcc1;
+}
+@-o-keyframes pcc1{
+    .x-animate-pcc1;
+}
+@keyframes pcc1{
+   .x-animate-pcc1;
+}
+.x-pcc1{
+	.x-animation(pcc1 2s linear infinite);
+}
+//pcc2从视频云计算到视频侦查云平台
+.x-animate-pcc2(){
+	0%{left:764px;top:34px;opacity: 0;}
+	25%{left:764px;top:34px;opacity: 1;}
+	39%{left:790px;top:34px;}
+	86%{left:790px;top:-117px;}
+	100%{left:814px;top:-117px;}
+}
+@-webkit-keyframes pcc2{
+   .x-animate-pcc2;
+}
+@-moz-keyframes pcc2{
+    .x-animate-pcc2;
+}
+@-o-keyframes pcc2{
+    .x-animate-pcc2;
+}
+@keyframes pcc2{
+   .x-animate-pcc2;
+}
+.x-pcc2{
+	.x-animation(pcc2 4s linear infinite);
+}
+//pcc3从视频云计算到综合运维管理平台
+.x-animate-pcc3(){
+	0%{left:764px;top:34px;opacity: 0;}
+	40%{left:766px;top:34px;opacity: 1;}
+	54%{left:790px;top:34px;}
+	86%{left:790px;top:-117px;}
+	100%{left:765px;top:-117px;}
+}
+@-webkit-keyframes pcc3{
+   .x-animate-pcc3;
+}
+@-moz-keyframes pcc3{
+    .x-animate-pcc3;
+}
+@-o-keyframes pcc3{
+    .x-animate-pcc3;
+}
+@keyframes pcc3{
+   .x-animate-pcc3;
+}
+.x-pcc3{
+	.x-animation(pcc3 5s linear infinite);
+}
+//pvd1从视云大数据平台到视频云存储pfs
+.x-animate-pvd1(){
+	0%{left:764px;top:34px;}
+	6%{left:790px;top:34px;}
+	94%{left:790px;top:334px;}
+	100%{left:814px;top:334px;}
+}
+@-webkit-keyframes pvd1{
+   .x-animate-pvd1;
+}
+@-moz-keyframes pvd1{
+    .x-animate-pvd1;
+}
+@-o-keyframes pvd1{
+    .x-animate-pvd1;
+}
+@keyframes pvd1{
+   .x-animate-pvd1;
+}
+.x-pvd1{
+	.x-animation(pvd1 4s linear infinite);
+}
+//pvd2从视云大数据平台到视频云计算pcc
+.x-animate-pvd2(){
+	0%{left:764px;top:34px;opacity: 0;}
+	25%{left:764px;top:34px;opacity: 1;}
+	31%{left:790px;top:34px;}
+	94%{left:790px;top:334px;}
+	100%{left:765px;top:334px;}
+}
+@-webkit-keyframes pvd2{
+   .x-animate-pvd2;
+}
+@-moz-keyframes pvd2{
+    .x-animate-pvd2;
+}
+@-o-keyframes pvd2{
+    .x-animate-pvd2;
+}
+@keyframes pvd2{
+   .x-animate-pvd2;
+}
+.x-pvd2{
+	.x-animation(pvd2 4s linear infinite);
+}
+//登录界面鼠标竖点动画
+.x-animate-mouse(){
+	0%{.x-transform(scale(2));opacity: 1;}
+	100%{.x-transform(scale(1));opacity: 0.8;}
+}
+@-webkit-keyframes mouse{
+   .x-animate-mouse;
+}
+@-moz-keyframes mouse{
+    .x-animate-mouse;
+}
+@-o-keyframes mouse{
+    .x-animate-mouse;
+}
+@keyframes mouse{
+   .x-animate-mouse;
+}
+.x-mouse{
+	.x-animation(mouse 1s ease infinite);
+}
+//登录界面登录框动画，由下到上，透明度从0到100
+.x-animate-loginInfo(){
+	0%{margin-top:30px;opacity: 0;}
+	100%{margin-top:0px;opacity: 1;}
+}
+@-webkit-keyframes loginInfo{
+   .x-animate-loginInfo;
+}
+@-moz-keyframes loginInfo{
+    .x-animate-loginInfo;
+}
+@-o-keyframes loginInfo{
+    .x-animate-loginInfo;
+}
+@keyframes loginInfo{
+   .x-animate-loginInfo;
+}
+.x-loginInfo{
+	.x-animation(loginInfo 0.4s ease-out forwards);
+}
+//登录界面标题向上动
+.x-animate-login(){
+	0%{padding-top:30px;}
+	100%{padding-top:0px;}
+}
+@-webkit-keyframes login{
+   .x-animate-login;
+}
+@-moz-keyframes login{
+    .x-animate-login;
+}
+@-o-keyframes login{
+    .x-animate-login;
+}
+@keyframes login{
+   .x-animate-login;
+}
+.x-login{
+	.x-animation(login 0.4s linear 0.1s forwards);
+}

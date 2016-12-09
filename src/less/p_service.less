@@ -1,0 +1,104 @@
+.serviceGrid{
+	.col-name {width:8%;}
+	.col-product{width:6%;}
+	.col-version{width:6%;}
+	.col-ip {width:5%;}
+	.col-cpu{width:9%;}
+	.col-mem {width:12%;}
+	.col-disk {width:13%;}
+	.col-flow{width:10%}
+	.col-status {width:6%;}
+	.hdr{
+		.col-actions{border-right:none;}
+	}
+	.col-actions{width:225px;}
+}
+.serviceGrid.noactionGrid{
+	.col-name {width:12%;}
+	.col-product{width:11%;}
+	.col-version{width:7%;}
+	.col-ip {width:7%;}
+	.col-mem {width:14%;}
+	.col-disk {width:14%;}
+	.col-flow{width:11%;}
+	.col-status {width:7%;border-right: none;}
+}
+.backupGrid{
+	.col-bkService{width:16%;}
+	.col-bkIP{width:9%;}
+	.col-backupTime{width:12%;}
+	.col-cycle{width:7%;}
+	.col-recoveryTime{width:11%;}
+	.col-recoveryService{width:10%;}
+	.col-comment{width:12%;}
+	.col-status{width:8%;}
+	.hdr{
+		.col-actions{border-right:none;}
+	}
+	.col-actions{width:50px;}
+	#itemList a:hover{cursor:default;}
+}
+.backupGrid.noactionGrid{
+	.col-status{border-right: none;}
+}
+
+.nv-vncDialog{overflow-x: hidden;overflow-y: hidden;}
+.ixw-modal-dialog .ixw-body.vncDialog{
+	width:1224px;height:855px;margin:0 auto;
+	.vncbtns{width:100%;height:30px;}
+	.content{height:835px;margin-left:62px;}
+	iframe{width:1100px; height : 810px;}
+	.clostbtn{width:8px;height:10px;.x-pic;.x-pic-distance-ico-close;margin:10px 10px;}
+	#openInNewWindow{display: inline-block;margin:6px 10px;color:#666;}
+	#openInNewWindow:hover{color:#222;}
+}
+.ixw-modal-dialog .area{
+	//max-height: 600px;overflow: auto;
+	.ConfigDetail{
+		input{width:150px;margin-right:8px;}
+		.prompt{padding-left:10px;}
+	}
+	.rscConfig{
+		margin-left:140px;
+		div{display: inline-block;}
+		.checkbox{width: 16px; height:16px;.x-ixpic;.x-ixpic-cb-uncheck;margin:0;}
+		.selected{.x-ixpic-cb-checked;}
+		.text{display: inline-block;padding:0 9px 0 8px;}
+	}
+	.container-body, .container-addition{display: none;}
+	.container-body.active, .container-addition.active{display: block;white-space: nowrap;}
+	.container-body{
+		.ip .value{display:inline-block;height: 30px;line-height: 30px;width:90px;}
+		.pic-close{width:9px;height: 9px;.x-pic;.x-pic-close;}
+	}
+	.container-addition{
+		margin-top:-10px;padding:15px;background: #f7f7f7;
+		.leftSide,.rightSide{display: inline-block; width:252px;}
+		.leftSide{
+			margin-right: 15px;
+			.search{width:250px;border:1px solid #9ca7a9;}
+			input{width:220px;border:0;}
+			.pic-search{display:inline-block;width:17px;height:17px;.x-pic;.x-pic-ico-search;margin :6px 10px 0 0;}
+		}
+		.rightSide{border: 1px solid #9ca7a9;vertical-align: top;padding: 10px;}
+		.ip-menu{
+			height:305px;overflow: auto;border:1px solid #9ca7a9;margin-top:15px;padding: 10px 0 10px 15px;
+		}
+		.checkbox{width:16px;height:16px;.x-ixpic;.x-ixpic-cb-uncheck;margin:0;min-height: 0;}
+		li{
+			span{display: inline-block;height: 16px;line-height: 16px;vertical-align: top;padding-left: 6px;width:100px;}
+		}
+		.selected{.x-ixpic-cb-checked;}
+		.ip-selected{height:300px;overflow: auto;}
+//		.pic-close{width:9px;height: 9px;.x-pic;.x-pic-close;margin-left:5px;}
+	}
+	.pic-close{width:9px;height: 9px;.x-pic;.x-pic-close;margin-left:5px;}
+}
+.ixw-modal-dialog .addServiceDlg .ConfigDetail{
+	position: relative;width:324px;background: #f6f6f6;border:1px solid #9ca7a9;margin-left:140px;
+	padding-bottom: 10px;margin-top:10px;
+	.label{width:60px;padding-right:10px;}
+	input{width:50px;margin-right:8px;}
+}
+
+

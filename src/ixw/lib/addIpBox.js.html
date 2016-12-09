@@ -1,0 +1,72 @@
+<tpl id="ipBox"><div class="leftSide">
+	<div class="search">
+		<input type="text" placeholder="搜索IP地址">
+		<a class="r pic-search" data-href="${search}"></a>
+	</div>
+	<div class="ip-menu"><ul id="ip-box"><tpl id="availIps">
+		<li id="menu-{value}"><a class="checkbox" data-href="$ip.select" data-key="{value}"></a><span>{value}</span></li>
+	</tpl>
+	</ul></div>
+</div >
+<div class="rightSide">
+	<div class="ip-selected"><ul></ul></div>
+	<div>
+		<a class="btn okbtn" data-href="$ip.sure" data-key="ok">确定</a>
+		<a class="btn cancelbtn" data-href="$ip.sure" data-key="cancle">取消</a>
+	</div>
+</div></tpl>
+<script>
+var globalActionConfig = IXW.Actions.configActions;
+var ipHT = {};
+globalActionConfig([["ip.search", function(params, el){
+	var inputEl = $XD.first(el.parentNode, "input");
+	var value = inputEl.value;
+	var leftSideEl = $XH.ancestor(el, "leftSide");
+	var ulEl = $XD.first($XH.first(leftSideEl, "ip-menu"), "ul");
+	jQuery(ulEl).find("li").removeClass("hide");
+	jQuery(ulEl).find("li.added").addClass("hide");
+	if(value){
+		IX.map(jQuery(ulEl).find("li"), function(item){
+			if(item.id.indexOf(value) <0 && item.id.indexOf("added") <0){
+				$XH.addClass(item, "hide");
+			}
+		});
+	}
+}],["ip.select", function(params, el){
+	$XH.toggleClass(el, "selected");
+	var key = params.key;
+	var cAdditionEL = $XH.ancestor(el, "container-addition");
+	var ulEl = jQuery(cAdditionEL).find(".ip-selected ul");
+	if($XH.hasClass(el, "selected")){
+		ulEl.append("<li id='selected-"+key+"'><span>"+key+"</span><a class='pic-close' data-href='$ip.cancle' data-key='"+key+"'></a></li>");
+	}else{
+		jQuery($X("selected-"+key)).remove();
+	}
+}], ["ip.cancle", function(params, el){
+	var liEl = $XD.ancestor(el, "li");
+	jQuery(liEl).remove();
+	var key = params.key;
+	var menuLiEl = $X('menu-'+key);
+	$XH.removeClass($XH.first(menuLiEl, "checkbox"), "selected");
+}], ["ip.sure", function(params, el){
+	ipHT.sure(params, el);
+}]]);
+IX.ns("SDV.addIpBox");
+SDV.addIpBox.ipBox = function(cfg){
+	ipHT.sure = $XF(cfg, "sureFn");
+	function getHTML(){
+		var ips = $XP(cfg, "ips", []);
+		return t_ipBox.renderData("", {
+			availIps : IX.map(ips, function(ip){
+					return {
+						value : ip
+					};
+				}),
+			search : $XP(cfg, "search", "") === "" ? "ip.search" : $XP(cfg, "search", "")
+		});
+	}
+	return {
+		getHTML : getHTML
+	};
+};
+</script>

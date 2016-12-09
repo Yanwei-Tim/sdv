@@ -1,0 +1,1305 @@
+<tpl id="overview">
+	<div class="p_overview">
+		<img class="ovbg" src="{ovBackground}">
+		<div class="ov-container">
+			<div class="ov-panels {panelActiveClz}" id="ovPanels"></div>
+			<div class="ov-sys {sysActiveClz}" id="ovSys"></div>
+			<div class="ov-pla {plaActiveClz}" id="ovPla"></div>
+		</div>
+		<div class="ov-left">
+			<a class="{panelActiveClz}" data-href="$ov.switch" data-key = "panel" >产品概况</a>
+			<a class="sys {sysActiveClz}" data-href="$ov.switch" data-key = "sys">系统状态</a>
+			<a class="sys {plaActiveClz}" data-href="$ov.switch" data-key = "pla">业务平台</a>
+			<span class="activeicon"></span>
+		</div>
+		<div class="ov-foot {panelActiveClz}" id="ovFoot4Panels"></div>
+		<div class="ov-foot {panelActiveClz}" id="ovFoot4Sys"></div>
+	</div>
+</tpl>
+<tpl id="ovfoot">
+	<div><span class="icon icon-total"></span><span class="text">{totalName}</span><span class="value">{total}</span></div>
+	<div><span class="icon icon-active"></span><span class="text">运行：</span><span class="value">{active}</span></div>
+	<div><span class="icon icon-stoped"></span><span class="text">{stopedName}</span><span class="value">{stoped}</span></div>
+	<div><span class="icon icon-error"></span><span class="text">故障：</span><span class="value">{error}</span></div>
+</tpl>
+<tpl id="panelsContainer"><tpl id="panels">
+	<div class="panelContainer {clz} {firstClz}">
+		<div class="panel panel-left {leftPanelClz}">{contentLHTML}
+		</div>
+		<div class="line {lineClz}"></div>
+		<div class="panel panel-right {rightPanelClz}">{contentRHTML}
+		</div>
+		<div class="verticalLine"></div>
+	</div>
+</tpl></tpl>
+<tpl id="contentContainer">
+	<div class="versionSwitch {hideClz}">
+		<a class="verPrev" data-href="$ov.verSwitch" data-key="prev"></a>
+		<a class="verNext" data-href="$ov.verSwitch" data-key="next"></a>
+	</div>
+	<div class="versionNav {hideClz}"><tpl id="navItem">
+		<a class="{activeClz}" data-href="$ov.verSwitch" data-key = "{key}" title="{version}"></a>
+	</tpl></div>
+	<tpl id="content"><div class="content {contentClz} {version} {disableClz}" data-key = "{key}">
+		<div class="contentContainer">
+		<div class="circle" data-href="{href}">
+			<div class="innerCircle">
+				<span class="title">{titleName}</span><span class="version">{version}</span>
+			</div>
+		</div>
+		<div class="itemContainer" data-title="{title}" data-version="{version}" style="width:{width}px">
+			<tpl id="servContent"><div class="servContent {activeClz} {numClz}" data-key="{key}"><tpl id="items">
+				<div class="item {servNumClz} {disableClz} {lastClz} {hasbtnClz}">
+					<div class="able">
+						<a data-href="$ov.openServive" class="ov-open">
+							<span class="text">{servName}</span>
+							<span class="num">×{servNum}</span>
+						</a>
+						<a class="ov-add" data-href = "$ov.addService" data-name="{servName}" data-key = "able"></a>
+					</div>
+					<a class="unable" data-href = "$ov.addService" data-name="{servName}" data-key="unable">
+						<span class="detailCon">
+							<span class="ov-add"></span>
+							<span class="text">{servName}</span>
+						</span>
+					</a>
+				</div>
+			</tpl></div></tpl>
+			<div class="servSwitch {hideClz}">
+				<a class="servPrev hide" data-href="$ov.servSwitch" data-key="prev"></a>
+				<a class="servNext" data-href="$ov.servSwitch" data-key="next"></a>
+			</div>
+			<div class="servNav {hideClz}"><tpl id="servNavItem">
+				<a class="{activeClz}" data-href="$ov.servSwitch" data-key = "{key}" title=""></a>
+			</tpl></div>
+
+		</div><div class="pointerBg {productClz}"></div>{pointerHTML}
+	</div></div></tpl>
+</tpl>
+<tpl id="pointerContainer"><tpl id="pointer">
+	<div class="pointer {productClz} {numClz}" data-key="{key}"></div>
+</tpl></tpl>
+<script>
+var overCaller = SDV.Global.overviewCaller;
+var servCaller = SDV.Global.serviceCaller;
+var periodic = SDV.Util.PeriodicChecker;
+var globalActionConfig = IXW.Actions.configActions;
+var Duration = 3; //3sec
+var serviceDialog = SDV.serviceDialog;
+var sdvDialog = SDV.Dialog;
+var hideDialog = SDV.Dialog.hide;
+var productNewHT = IX.IListManager(); //用于保存各个产品有多少个新产品
+var ixwPages = IXW.Pages;
+var userType;
+var overviewDialog = SDV.overviewDialog;
+var $=jQuery;
+
+var footCfg = {
+	overview : {
+		total : "服务总数：",
+		stoped : "已停止："
+	},
+	sysOverview : {
+		total : "服务器总数：",
+		stoped : "关机："
+	}
+};
+function refreshCurService(el, key){
+	var ableEl, unableEl,numEl;
+	var itemEl = $XH.ancestor(el, "item");
+	ableEl = $XH.first(itemEl, "able");
+	numEl = $XH.first($XD.first(ableEl, "a"), "num");
+	var beforeNum = parseInt(numEl.innerHTML.substring(1));
+	numEl.innerHTML = "×"+(beforeNum + 1);
+	if(key === "able"){
+		$XH.removeClass(itemEl, "disable");
+	}else if(key === "unable"){
+		$XH.removeClass(itemEl, "none");
+	}
+	if(beforeNum){
+		$XH.removeClass(itemEl, numCfg[beforeNum]);
+	}
+	if(beforeNum + 1 > 2){
+		$XH.addClass(itemEl, "more");
+	}else{
+		$XH.addClass(itemEl, numCfg[beforeNum+1]);
+	}
+}
+globalActionConfig([["ov.addService", function(params, el){
+	var itemEl = $XH.ancestor(el, "item");
+	if($XH.hasClass(itemEl, "noBtn")) return;
+	var containerEl = $XH.ancestor(el, "itemContainer");
+	var product = $XD.dataAttr(containerEl, "title");
+	var version = $XD.dataAttr(containerEl, "version");
+	var service = $XD.dataAttr(el, "name");
+	var infoParams = {
+		product : product,
+		version : version,
+		service : service
+	};
+	var key = params.key;
+	serviceDialog.addService4OV(infoParams,function(data){
+		servCaller("addService", data, function(retData){
+			var isPrompt = $XP(retData, "isPrompt");
+			var names = $XP(retData, "names",[]).join("和");
+			var promptInfo = "系统中未创建" + names + ",会影响"+data.product+"部分功能的使用，是否继续创建该服务？";
+			hideDialog();
+			if(isPrompt){
+				sdvDialog.confirm("提示", promptInfo, function(){
+					servCaller("addService", IX.inherit(data, {isCheck :0}), function(){
+						hideDialog();
+						refreshCurService(el, key);
+					}, hideDialog);
+				});
+			}else{
+				refreshCurService(el, key);
+				var isNeedAuth = $XP(retData, "isNeedAuth");
+				var id = $XP(retData, "id");
+				if(isNeedAuth){
+					var form = jQuery('<form id="form" action="services/downloadKey" method="POST" style="display:none"></from>');
+					var input = jQuery('<input type="text" name="serviceId" value="'+id+'">');
+					jQuery("#body").append(form);
+					form.append(input);
+					form.submit();
+					form.remove();
+				}
+			}
+		}, hideDialog);
+	});
+}],["ov.openServive", function(params, el){
+	var containerEl = $XH.ancestor(el, "itemContainer");
+	var product = $XD.dataAttr(containerEl, "title");
+	ixwPages.load(ixwPages.createPath("services"), function(){
+		return {product : product};
+	});
+}], ["ov.switch", function(params, el){
+	var key = params.key;
+	if($XH.hasClass(el, "active")) return;
+	var ovLeftEl = $XH.ancestor(el, "ov-left");
+	var activeicon = $XH.first(ovLeftEl, "activeicon");
+	if(key === "panel"){
+		switchClass("ovPanels");
+		activeicon.style.top = "-5px";
+		switchOut();
+	}else if(key === "sys"){
+		switchClass("ovSys");
+		activeicon.style.top = "127px";
+		wave=null; cpuChart = null; memChart = null; flowChart=null;
+		$X('ovSys').innerHTML = t_sysOverview.renderData();
+		showSys();
+	}else{ //业务平台
+		switchClass("ovPla");
+		activeicon.style.top = "259px";
+		switchOut();
+		showPla();
+	}
+	
+	function switchClass(name){
+		$XH.removeClass($XH.first(ovLeftEl, "active"), "active");
+		$XH.addClass(el, "active");
+		$('.ov-container > *').removeClass('active');
+		$XH.addClass($X(name),"active");
+		$('.ov-foot').removeClass('active');
+		if(name === "ovPla"){
+			$('.ov-container').addClass('pla-container');
+		}else if(name === "ovPanels"){
+			$XH.addClass($X('ovFoot4Panels'), "active");
+			$('.ov-container').removeClass('pla-container');
+		}else{
+			$XH.addClass($X('ovFoot4Sys'),"active");
+			$('.ov-container').removeClass('pla-container');
+		}
+	}
+}], ["ov.verSwitch", function(params, el){
+	var key = params.key;
+	if($XH.hasClass(el, "active")) return;
+	var panelEl = $XH.ancestor(el, "panel");
+	var activeEl = $XH.first(panelEl, "active");
+	var isDisable = $XH.hasClass(activeEl,"disable");
+	$XH.removeClass(activeEl, "active");
+	var nowEl;
+	var contentEls = jQuery(panelEl).find(".content");
+	var contentlen = contentEls.length;
+	var verNavEl;
+	if(key === "prev" || key === "next"){
+		var vKey = $XD.dataAttr(activeEl, "key");
+		$XH.removeClass(activeEl, "active");
+		var idx;
+		if(key === "prev"){
+			idx = parseInt(vKey) -1;
+			if( idx=== 0) idx = contentlen;
+		}else if(key === "next"){
+			idx = parseInt(vKey) + 1;
+			if(idx === contentlen +1) idx = 1;
+		}
+		IX.map(contentEls, function(item){
+			if($XD.dataAttr(item, "key") -0 === idx){
+				nowEl = item;
+				$XH.addClass(item, "active");
+			}
+		});
+		verNavEl = $XH.first(panelEl, "versionNav");
+		$XH.removeClass($XH.first(verNavEl, "active"), "active");
+		IX.map(jQuery(verNavEl).find("a"), function(item){
+			if($XD.dataAttr(item, "key") -0 === idx)
+				$XH.addClass(item, "active");
+		});
+	}else{
+		verNavEl = $XH.ancestor(el, "versionNav");
+		$XH.removeClass($XH.first(verNavEl, "active"),"active");
+		$XH.addClass(el, "active");
+		IX.map(contentEls, function(item){
+			if($XD.dataAttr(item, "key") -0 === $XD.dataAttr(el, "key")-0){
+				nowEl = item;
+				$XH.addClass(item, "active");
+			}
+		});
+	}
+	var isNowDisable = $XH.hasClass(nowEl, "disable");
+	if(isDisable === isNowDisable) return;
+	var pointerEl = $XH.first(nowEl, "pointer");
+	if(!pointerEl) return;
+	var pkey = $XD.dataAttr(pointerEl, "key");
+	if(isDisable && !isNowDisable){
+		jQuery(".content .to"+pkey).removeClass("disable");
+	}else if(!isDisable && isNowDisable){
+		jQuery(".content .to"+pkey).addClass("disable");
+	}
+}], ["ov.servSwitch", function(params, el){
+	var key = params.key;
+	var itemContainerEl = $XH.ancestor(el, "itemContainer");
+	var activeEl = $XH.first(itemContainerEl, "active");
+	var servContentEls = jQuery(itemContainerEl).find(".servContent");
+	var servContentElLen = servContentEls.length;
+
+	var panelEl = $XH.ancestor(el, "panel");
+	var baseWidth;
+	var marginLeft = parseInt(jQuery(itemContainerEl).css("margin-left"));
+	if($XH.hasClass(panelEl, "panel-left")){
+		baseWidth = 631;
+	}else{
+		baseWidth = 272;
+	}
+	var idx, nowEl,servSwitchEl,servNavEl;
+	var oldKey = $XD.dataAttr(activeEl, "key");
+	if(key === "prev" || key === "next"){
+		servSwitchEl = $XH.ancestor(el, "servSwitch");
+		servNavEl = $XH.first(itemContainerEl, "servNav");
+		idx = key === "prev" ?oldKey- 1 :oldKey- (-1);
+		if(key === "prev" ){
+			$XH.removeClass($XH.first(servSwitchEl, "servNext"), "hide");
+			if(idx ===1)
+				$XH.addClass(el, "hide");
+			jQuery(itemContainerEl).css("margin-left", (marginLeft + baseWidth) + "px");
+		}else if(key === "next"){
+			$XH.removeClass($XH.first(servSwitchEl, "servPrev"), "hide");
+			if(idx === servContentElLen)
+				$XH.addClass(el, "hide");
+			jQuery(itemContainerEl).css("margin-left", (marginLeft - baseWidth) + "px");
+		}
+		$XH.removeClass(activeEl, "active");
+		IX.map(servContentEls, function(item){
+			if( $XD.dataAttr(item, "key") -0 === idx){
+				nowEl = item;
+				$XH.addClass(item, "active");
+			}
+		});
+		$XH.removeClass($XH.first(servNavEl, "active"), "active");
+		IX.map(jQuery(servNavEl).find("a"), function(item){
+			if($XD.dataAttr(item, "key") -0 === idx)
+				$XH.addClass(item, "active");
+		});
+	}else{
+		if($XH.hasClass(el, "active")) return;
+		servNavEl = $XH.ancestor(el, "servNav");
+		$XH.removeClass($XH.first(servNavEl, "active"), "active");
+		$XH.addClass(el, "active");
+		$XH.removeClass(activeEl, "active");
+		IX.map(servContentEls, function(item){
+			if( $XD.dataAttr(item, "key") -0 === key -0){
+				idx = $XD.dataAttr(item, "key") -0;
+				nowEl = item;
+				$XH.addClass(item, "active");
+				jQuery(itemContainerEl).css("margin-left", (marginLeft + baseWidth * (oldKey - key)) + "px");
+			}
+		});
+		servSwitchEl = $XH.first(itemContainerEl, "servSwitch");
+		if(idx===1){
+			$XH.removeClass($XH.first(servSwitchEl, "hide"), "hide");
+			$XH.addClass($XH.first(servSwitchEl, "servPrev"), "hide");
+		}else if(idx === servContentElLen){
+			$XH.removeClass($XH.first(servSwitchEl, "hide"), "hide");
+			$XH.addClass($XH.first(servSwitchEl, "servNext"), "hide");
+		}else{
+			$XH.removeClass($XH.first(servSwitchEl, "hide"), "hide");
+		}
+
+	}
+}],["ov.plaSwitch", function(params, el){
+	var container = $(el).parents(".plaContainer");
+	var ul = container.find(".plaBar");
+	var itemLength = ul.children().size();
+	var pagerItems = container.find(".pagerItem");
+	var activeIndex = container.find(".pagerItem.active").index();
+	var dir = params.key;
+	var ml = parseInt(ul.css("margin-left"));
+	var index;
+	if(dir === "left"){
+		if(activeIndex === 0) return;
+		plaSwitch(ml + 1158, activeIndex - 1);
+	}else if(dir === "right"){
+		if(activeIndex === itemLength - 1) return;
+		plaSwitch(ml - 1158, activeIndex + 1);
+	}else{
+		index = $(el).index();
+		if(index === activeIndex) return;
+		plaSwitch(- index * 1158, index);
+	}
+	
+	function plaSwitch(ml,activeIndex){
+		ul.css("margin-left", ml);
+		pagerItems.removeClass("active");
+		pagerItems.eq(activeIndex).addClass("active");
+		if(activeIndex === 0)$(".plaPager .leftBtn").addClass("hide");
+		else $(".plaPager .leftBtn").removeClass("hide");
+		if(activeIndex === itemLength - 1)$(".plaPager .rightBtn").addClass("hide");
+		else $(".plaPager .rightBtn").removeClass("hide");
+	}
+}],["ov.addProduct",function(params, el) {
+	overviewDialog.addProduct($XP(params, "key", ""), function(data) {
+		servCaller("addService", data, function() {
+			hideDialog();
+			showPla();
+		}, function() {
+			hideDialog();
+		});
+	});
+}]]);
+var servFlag = {"-1" : "none",
+	"0" : "disable",
+	"1" : ""
+};
+var baseProduct = {
+	"视云大数据平台" : "PVD",
+	"视频云存储" : "PFS",
+	"集群云存储": "ROFS",
+	"视云联网平台" : "PVG",
+	"视频云计算" : "PCC",
+	"综合运维管理系统" : "IMS",
+	"视云实战平台" : "PVA",
+	"视频侦查云平台" : "ICP",
+	"pvg" : "PVG",
+	"pfs" : "PFS",
+	"社会化运营" : "SMT",
+	"物理安防信息管理系统" : "SIS"
+};
+var product4flow = {
+	"视云大数据平台" : {
+		name : "PVD",
+		flowTo : ["PFS","PCC"]
+	},
+	"视频云存储" : {
+		name : "PFS",
+		flowTo : ["PCC"]
+	},
+	"pfs" : {
+		name : "PFS",
+		flowTo : ["PCC"]
+	},
+	"集群云存储":{
+		name : "ROFS",
+		flowTo : ["PFS","ICP","PVA"]
+	},
+	"视云联网平台" : {
+		name : "PVG",
+		flowTo : ["PVA","PCC"]
+	},
+	"pvg" : {
+		name : "PVG",
+		flowTo : ["PVA","PCC","SMT","SIS"]
+	},
+	"视频云计算" : {
+		name : "PCC",
+		flowTo : ["PFS","ICP","IMS"]
+	}
+};
+var formatTitle = {//需要变更格式的名称
+	"综合运维管理系统" : "<span>综合运维</span><span>管理系统</span>",
+	"视云联网平台" : "<span>视云联网</span><span>平台</span>",
+	"视云实战平台" : "<span>视云实战</span><span>平台</span>",
+	"视频侦查云平台" : "<span>视频侦查</span><span>云平台</span>"
+};
+var allOutFlow = ["PFS","ICP","PVA","PCC","IMS"];
+var outToinFlow = {//数据流向的流出到流入
+	PFS : ["ROFS", "PCC", "PVD"],
+	ICP : ["ROFS", "PCC"],
+	PVA : ["ROFS", "PVG"],
+	PCC : ["PVG", "PFS", "PVD"],
+	IMS : ["PCC"]
+};
+var allInFlow = ["PVD","PFS","ROFS","PVG","PCC"];
+var inToOutFlow = {
+	PVD : ["PFS", "PCC"],
+	PFS : ["PCC"],
+	ROFS : ["PFS","ICP","PVA"],
+	PVG : ["PVA","PCC"],
+	PCC : ["PFS","ICP","IMS"]
+};
+var numCfg = {
+	1 : "one",
+	2 : "two",
+	3 : "three",
+	4 : "four",
+	5 : "five"
+};
+function getServItems(servDatas){
+	return IX.map(servDatas, function(servData, index){
+		var count = parseInt($XP(servData, "count"));
+		var flag = parseInt($XP(servData, "servFlag"));
+		return {
+			disableClz : servFlag[flag],
+			hasbtnClz : userType ? "" : "noBtn",
+			servNumClz : count === 1 ? "one" : count === 2 ? "two" : count >2 ? "more" : "",
+			lastClz : index === servDatas.length -1 ? "last" : "",
+			servName : $XP(servData, "name", ""),
+			servNum : count
+		};
+	});
+}
+function getReServDatas(servDatas, type){//type用来区分左右，左边一行最多放5个服务，右边2个。
+	var reServDatas = [];
+	var baseNum = type === "left" ? 5 : 2;
+	if(servDatas.length <baseNum +1)
+		reServDatas.push(servDatas);
+	else{
+		var num = Math.ceil(servDatas.length/baseNum);
+		for(var i=0; i<num; i++){
+			reServDatas.push(servDatas.slice(i*baseNum,i*baseNum + baseNum));
+		}
+	}
+	return reServDatas;
+}
+function getServContent(reServDatas){
+	return IX.map(reServDatas, function(reServData, index){
+		return {
+			activeClz : index === 0 ? "active" : "",
+			numClz : numCfg[index +1],
+			key  : index +1,
+			items : getServItems(reServData)
+		};
+	});
+
+}
+function isEmptyObj(e){
+	var t;
+	for(t in e)
+		return !1;
+	return !0;
+}
+function getPointerHTML(data){
+	var isBase = $XP(data, "isBase");var pointerArr = [];
+	if(!isBase) return "";
+	var pdt = product4flow[$XP(data, "name")];
+	if(!pdt) return "";
+	var pdtClz = pdt.name, pdtNum = pdt.flowTo.length;
+	var newVersion = $XP(data, "newVersion", []);
+	for(var i=0; i< pdtNum; i++){
+		pointerArr.push({
+			productClz : pdtClz,
+			numClz : "to"+pdt.flowTo[i],
+			key : pdtClz
+		});
+	}
+	return t_pointerContainer.renderData("", {pointer : pointerArr});
+}
+function getContent(data, type){
+	if(isEmptyObj(data)) return "";
+	var version = $XP(data, "version", "");
+	var newVersion = $XP(data, "newVersion", []);
+	var contentData = [];  //用户保存一个产品的各个版本数组
+	contentData.push(data);
+	if(newVersion.length){
+		contentData = contentData.concat(newVersion);
+	}
+	var baseNum = type === "left" ? 5 : 2;//每行放多少个服务
+	var pointerHTML = getPointerHTML(data);
+	return t_contentContainer.renderData("", {
+		hideClz : contentData.length >1 ? numCfg[contentData.length] : "hide",
+		navItem : IX.map(contentData, function(item, index){
+			var ver =  $XP(item, "version");
+			return {
+				activeClz : ver=== version ? "active" : "",
+				version : $XP(item, "version", ""),
+				key : index +1
+			};
+		}),
+		content : IX.map(contentData, function(item, index){
+					var version = $XP(item, "version", "");
+					var servDatas = $XP(item, "services",[]);
+					var reServDatas = getReServDatas(servDatas, type);
+					var name = $XP(item, "name", "");
+					var pdt = product4flow[$XP(data, "name")];
+					var pdtClz = pdt ? pdt.name : "";
+					return {
+						contentClz : index === 0 ? "active" : "",
+						disableClz : parseInt($XP(item, "proFlag")) ? "" : "disable",
+						key : index +1,
+						href : "http://www.baidu.com",//$XP(item, "href", ""),
+						titleName : formatTitle[name] ? formatTitle[name] : name,
+						title : name,
+						version : version,
+						width : type ==="left" ? 631 * reServDatas.length : 272 * reServDatas.length,
+						servContent : getServContent(reServDatas),
+						hideClz : servDatas.length < baseNum +1 ? "hide" : "",
+						servNavItem : IX.map(reServDatas, function(item, index){
+										return {
+											activeClz : index=== 0 ? "active" : "",
+											key  : index+1
+										};
+									}),
+						productClz : pdtClz,
+						pointerHTML : pointerHTML
+					};
+				})
+	});
+}
+function getPanels(data){
+	//var panelDatas = getPanelDatas(data);//重新获取渲染数组
+	var panelDatas = data;
+	var firstVer, first;
+	return IX.map(panelDatas, function(panelData, index){
+		var left = $XP(panelData, "left", {});
+		var right = $XP(panelData, "right", {});
+		if(!firstVer){
+			if(!isEmptyObj(left) || !isEmptyObj(right))
+				{firstVer = true;first = index;}
+		}
+		//var pointerLHTML = getPointerHTML(left);
+		//var pointerRHTML = getPointerHTML(right);
+		return {
+			clz : firstVer ? "hasVerLine" : "",
+			firstClz : first === index ? "first" : panelDatas.length === index +1 ? "last" : "",
+			leftPanelClz : isEmptyObj(left) ? "invisible" : baseProduct[$XP(left, "name")] ? baseProduct[$XP(left, "name")] : "",
+			contentLHTML : getContent(left, "left"),
+			lineClz : isEmptyObj(left) ? "lInvisible" : isEmptyObj(right) ? "rInvisible" : "",
+			rightPanelClz : isEmptyObj(right) ? "invisible" : baseProduct[$XP(right, "name")] ? baseProduct[$XP(right, "name")] : "",
+			contentRHTML : getContent(right, "right"),
+
+		};
+	});
+}
+</script>
+<tpl id="sysOverview">
+	<div class="section cpu">
+		<div class="title"><span class="icon-cpu"></span>CPU(核)</div>
+		<div class="sys-container">
+			<div class="left">
+				<div class="detail">
+					<div class="showDetail"></div>
+				</div>
+				<div class="value"></div>
+				<div class="name">CPU分配</div>
+			</div>
+			<div class="right" id="cpu"></div>
+			<div class="cut"><span></span></div>
+		</div>
+	</div>
+	<div class="section storage">
+		<div class="title"><span class="icon-storage"></span>存储(TB)</div>
+		<div class="sys-container">
+			<div class="outer">
+				<div class="inner"><canvas id="cav-storage" width="108" height="108"></canvas></div>
+				<div class="text">
+					<span class="percent"></span>
+					<span class="rate"></span>
+				</div>
+			</div>
+			<div class="cut"><span></span></div>
+		</div>
+	</div>
+	<div class="section mem">
+		<div class="title"><span class="icon-mem"></span>内存(GB)</div>
+		<div class="sys-container">
+			<div class="left">
+				<div class="detail">
+					<div class="showDetail"></div>
+				</div>
+				<div class="value"></div>
+				<div class="name">内存分配</div>
+			</div>
+			<div class="right" id="mem"></div>
+			<div class="cut"><span></span></div>
+		</div>
+	</div>
+	<div class="section flow">
+		<div class="title"><span class="icon-flow"></span>网络流量</div>
+		<div class="sys-container">
+			<div class="flow-container" id="flow"></div>
+			<div class="cut"><span></span></div>
+		</div>
+	</div>
+</tpl>
+<script>
+var updateIndicsInterval = null;
+var cpuChart, memChart, flowChart;
+var wave;
+var baseInfo = {
+	cpu : {
+		text : "CPU使用情况",
+		lineColor : "#00f0ff",
+		areaColor : "#00f0ff"
+	},
+	mem : {
+		text : "内存使用情况",
+		lineColor : "#0affd9",
+		areaColor : "#00fac9"
+	}
+};
+var options = {
+	base : { //cpu和mem
+		title : {
+			text : "",
+			bottom : 14,
+			left: 70,
+			textStyle : {
+				color : '#00cef8',
+				fontSize : 12,
+				fontWeight : "normal",
+				fontFamily : "宋体"
+			}
+		},
+		tooltip : {
+			trigger: 'axis',
+			backgroundColor : 'rgba(255,255,255,0.4)',
+			padding : [15,10],
+			axisPointer : {
+				animation : false,
+				lineStyle : {color : '#0086c5'}
+			},
+			formatter : " {b}<br>使用情况 : {c}%"
+		},
+		grid: {
+			show : true,
+	        left: 33,
+	        right: 33,
+	        bottom: 20,
+	        top : 30,
+	        containLabel: true,
+	        backgroundColor : 'rgba(0,49,88,0.3)',
+	        borderWidth :0
+	    },
+		xAxis :
+			[{
+				type :"category",
+				boundaryGap : false,
+				axisLine : {
+					lineStyle : {
+						color : ["#1b507b"]
+					}
+				},
+				splitLine: {
+					show: false
+				},
+				axisLabel : {show:false},
+				data : []
+			},{
+				type :"category",
+				boundaryGap : false,
+				axisLine : {
+					lineStyle : {
+						color : ["#1b507b"]
+					}
+				},
+				splitLine: {
+					show: false
+				},
+				data : []
+			}],
+		yAxis : [{
+				type : "value",
+				min :0,
+				max:100,
+				axisLine : {
+					lineStyle : {
+						color : ["#1b507b"]
+					}
+				},
+				splitLine: {
+					show: true,
+					lineStyle : {
+						color : ["#1b507b"]
+					}
+				},
+				axisTick :{
+					show:false
+				},
+				axisLabel : {
+					formatter : '{value}%',
+					textStyle : {
+						color : '#00cef3'
+					}
+				}
+		}, {
+			type : "value",
+			axisLine : {
+				lineStyle : {
+					color : ["#1b507b"]
+				}
+			},
+			splitLine: {
+				show: false,
+			},
+			axisTick :{
+				show:false
+			},
+			axisLabel : {
+				show: false
+			}
+		}],
+		series : [{
+			name : "百分比",
+			type : "line",
+			lineStyle : {
+				normal : {
+					color : "#00f0ff"
+				}
+			},
+			itemStyle : {
+				normal : {
+					color : "#00f0ff",
+					borderWidth : 1
+				}
+			},
+			areaStyle : {
+				normal : {
+					color : "#00f0ff",
+					opacity : 0.6
+				}
+			},
+			data : []
+		}]
+	},
+	flow : {
+		legend: {
+			data:[{
+				name : "下行流量",
+				icon : "rect",
+				textStyle : {
+					color : '#00f0ff'
+				}
+			},{
+				name : "上行流量",
+				icon : "rect",
+				textStyle : {
+					color : '#ff8b8b'
+				}
+			}],
+			bottom : 20
+		},
+		tooltip : {
+			trigger: 'axis',
+			backgroundColor : 'rgba(255,255,255,0.4)',
+			padding : [15,10],
+			axisPointer : {
+				animation : false,
+				lineStyle : {color : '#0086c5'}
+			}
+		},
+		grid: {
+			show:true,
+	        left: 18,
+	        right: 8,
+	        bottom: 38,
+	        top : 8,
+	        containLabel: true,
+	        borderWidth :0
+	    },
+		xAxis : [
+			{
+				type :"category",
+				boundaryGap : false,
+				axisLine : {
+					lineStyle : {
+						color : ["#1b507b"]
+					}
+				},
+				splitLine: {show: false},
+				axisLabel : {
+					show : false
+				},
+				data : []
+			},{
+				type :"value",
+				position : "top",
+				axisLine : {
+					onZero: false,
+					lineStyle : {
+						color : ["#1b507b"]
+					}
+				},
+				splitLine: {show: false},
+				axisTick :{show:false},
+				axisLabel : {show: false},
+				data : []
+			}
+		],
+		yAxis : [
+	        {
+	            type : 'value',
+	            axisLine : {
+					lineStyle : {
+						color : ["#1b507b"]
+					}
+				},
+				splitLine: {
+					show: false
+				},
+				axisTick :{
+					show:false
+				},
+				axisLabel : {
+					formatter : '{value}',
+					textStyle : {
+						color : '#00cef3'
+					}
+				}
+	        },{
+	        	type : 'value',
+	        	axisLine : {
+					lineStyle : {
+						color : ["#1b507b"]
+					}
+				},
+				splitLine: {
+					show: false,
+				},
+				axisLabel : {
+					show : false
+				},
+				axisTick :{
+					show:false
+				},
+				inverse : true
+	        }
+	    ],
+		series : [
+			{
+				name : "下行流量",
+				type : "line",
+				lineStyle : {
+					normal : {
+						color : "#00f0ff"
+					}
+				},
+				itemStyle : {
+					normal : {
+						color : "#00f0ff",
+						borderWidth : 1
+					}
+				},
+				areaStyle : {
+					normal : {
+						color : "#00f0ff",
+						opacity : 0.6
+					}
+				},
+				data : []
+			},
+			{
+				name : "上行流量",
+				type : "line",
+				lineStyle : {
+					normal : {
+						color : "#ff8b8b"
+					}
+				},
+				itemStyle : {
+					normal : {
+						color : "#ff8b8b",
+						borderWidth : 1
+					}
+				},
+				areaStyle : {
+					normal : {
+						color : "#ff8b8b",
+						opacity : 0.6
+					}
+				},
+				data : []
+			}
+		]
+	}
+};
+function getComparedFlow(upData, downData){
+	var upMax = Math.max.apply(Math, upData);
+	var downMax = Math.max.apply(Math, downData);
+	var upFlow, downFlow, max;
+	if(upMax > downMax){
+		upFlow = calYAxis4Flow(upData);
+		downFlow = calYAxis4Flow(downData, upFlow.baseNum);
+		max = $XP(upFlow, "maxY");
+	}else{
+		downFlow = calYAxis4Flow(downData);
+		upFlow = calYAxis4Flow(upData, downFlow.baseNum);
+		max = $XP(downFlow, "maxY");
+	}
+	return {
+		upFlow : upFlow,
+		downFlow : downFlow,
+		max : max,
+		unity : $XP(upFlow, "unity")
+	};
+}
+function calYAxis4Flow(data, baseNum){//后台返回的单位是KB/s
+	var flowData = data;
+	var maxY = 100;
+	var unity;
+	var maxNum = Math.max.apply(Math, flowData);
+	if(baseNum){
+		if(baseNum === 1024*1024*1024){
+			unity = "G";
+		}else if(baseNum === 1024*1024){
+			unity = "M";
+		}else if(baseNum === 1024){
+			unity = "K";
+		}else{
+			unity = "";
+		}
+	}else{
+		if(maxNum >= 1024*1024*1024){
+			maxY = maxNum/1024/1024/1024;
+			unity = "G";
+			baseNum = 1024*1024*1024;
+		}else if(maxNum >= 1024*1024){
+			maxY = maxNum/1024/1024;
+			unity = "M";
+			baseNum = 1024*1024;
+		}else if(maxNum >= 1024){
+			maxY = maxNum/1024;
+			unity = "K";
+			baseNum = 1024;
+		}else{
+			maxY = maxNum;
+			unity = "";
+			baseNum = 1;
+		}
+	}
+	if(baseNum !==1){
+		for(var i=0; i< flowData.length; i++){
+			flowData[i] = Math.ceil(100*flowData[i] /baseNum)/100;
+		}
+	}
+	return {
+		maxY : Math.ceil(maxY),
+		unity : unity,
+		baseNum : baseNum,
+		data : flowData
+	};
+
+}
+function sdvCharts(cfg){
+	var container = $XP(cfg, "container");
+	var el = $X(container);
+	var chart = echarts.init(el);
+	return {
+		show : function(type){
+			chart.setOption(options[type]);
+		},
+		refresh : function(data){
+			if(container !== "flow"){
+				options.base.series[0].data = IX.map(data, function(item){
+					return $XP(item, "usage",0);
+				});
+				options.base.title.text = baseInfo[container].text;
+				options.base.series[0].lineStyle.normal.color = baseInfo[container].lineColor;
+				options.base.series[0].itemStyle.normal.color = baseInfo[container].lineColor;
+				options.base.series[0].areaStyle.normal.color = baseInfo[container].areaColor;
+				options.base.xAxis[0].data = IX.map(data, function(item){
+					return  $XP(item, "time",0);
+				});
+				chart.setOption({series : options.base.series, title :options.base.title, xAxis : options.base.xAxis});
+			}else{
+				var downData = IX.map(data, function(item){
+					return $XP(item, "down",0);
+				});
+				var upData = IX.map(data, function(item){
+					return $XP(item, "up",0);
+				});
+				var flowData = getComparedFlow(upData, downData);
+				var upInfo = $XP(flowData, "upFlow", {});
+				var downInfo = $XP(flowData, "downFlow", {});
+				options.flow.series[0].data = $XP(downInfo, "data",[]);
+				options.flow.series[1].data = $XP(upInfo, "data",[]);
+				options.flow.yAxis[0].max = $XP(flowData, "max",100);
+				options.flow.yAxis[0].axisLabel.formatter = '{value} '+ $XP(flowData, "unity","K") + "B/s";
+				options.flow.xAxis[0].data = IX.map(data, function(item){
+					return  $XP(item, "time",0);
+				});
+				chart.setOption({series : options.flow.series, xAxis : options.flow.xAxis, yAxis : options.flow.yAxis});
+			}
+		}
+	};
+}
+function showCpuAndmMem(data){
+	IX.map(["cpu", "mem"], function(type){
+		var info = $XP(data, type);
+		var allocated = 0, total = 0;
+		if(info){
+			allocated = $XP(info[info.length-1], "allocated",0);
+			total = $XP(info[info.length-1], "total",0);
+		}
+		var usage =total ===0 ? "0%" : Math.round(allocated/total*100) + "%";
+		jQuery(".section."+type +" .left .value").html(allocated + "/" + total);
+		jQuery(".section."+type +" .left .showDetail").css("bottom", usage).html("<span>"+usage+"</span>");
+	});
+	if(!cpuChart){
+		cpuChart = new sdvCharts({
+			container : "cpu"
+		});
+		cpuChart.show("base");
+	}
+	cpuChart.refresh($XP(data, "cpu",[]));
+	if(!memChart){
+		memChart = new sdvCharts({
+			container : "mem"
+		});
+		memChart.show("base");
+	}
+	memChart.refresh($XP(data, "mem",[]));
+}
+function showFlow(flowData){
+	if(!flowChart){
+		flowChart = new sdvCharts({
+			container : "flow"
+		});
+		flowChart.show("flow");
+	}
+	flowChart.refresh(flowData);
+}
+function showStorage(storageData){
+	var total = $XP(storageData, "total");
+	var allocated = $XP(storageData, "allocated");
+	var percent = Math.round(allocated / total *100)/100;
+	jQuery(".section.storage .text .percent").html(Math.round(allocated / total *100) + "%");
+	jQuery(".section.storage .text .rate").html(allocated + "/" + total);
+	if(!wave){
+		wave = SDV.Wave.SDVWave({name : "storage", item : {indicsNum : percent}});
+		wave.initWave();
+	}else{
+		wave.refresh({indicsNum : percent});
+	}
+}
+function showSys(){
+	overCaller("getSysData", {}, function(data){
+		var serverInfo = $XP(data, "serverCountInfo", {});
+		$X('ovFoot4Sys').innerHTML = t_ovfoot.renderData("",{
+			totalName : footCfg.sysOverview.total,
+			stopedName : footCfg.sysOverview.stoped,
+			total : $XP(serverInfo, "total"),
+			active : $XP(serverInfo, "active"),
+			stoped : $XP(serverInfo, "stoped"),
+			error : $XP(serverInfo, "error")
+		});
+		showCpuAndmMem(data);
+		showFlow($XP(data, "flow", []));
+		showStorage($XP(data, "storage", {}));
+		//startInterval();
+	});
+}
+function startInterval(){
+	updateIndicsInterval = setInterval(function(){
+		overCaller("getSysData", {}, function(data){
+			showCpuAndmMem(data);
+			showFlow($XP(data, "flow", {}));
+			showStorage($XP(data, "storage", {}));
+		});
+	}, 3000);
+}
+</script>
+<tpl id="plaOverview">
+	<tpl id="panels">
+		<div class="plaContainer">
+			<div class="title text-center">
+				<span>{levelName}</span>
+			</div>
+			<div class="plaPanel">{contentHTML}
+			</div>
+			<div class="plaPager {showPager}">
+				<a class="leftBtn" data-href="$ov.plaSwitch" data-key = "left"></a>
+				<a class="rightBtn" data-href="$ov.plaSwitch" data-key = "right"></a>
+				<div class="pageNum">
+					<tpl id="pagerItem">
+						<a class="pagerItem {activeClz}" data-href="$ov.plaSwitch" data-key = "num"></a>
+					</tpl>
+				</div>
+			</div>
+		</div>
+	</tpl>
+</tpl>
+<tpl id="plaBar">
+	<ul class="plaBar" style="width: {width}px;">
+		<tpl id="plaItem">
+			<li class="plaItem">
+				<tpl id="plaBox">
+					<div class="plaBox {lastClz}">
+						<div class="plaTitle">{plaName}</div>
+						<div class="plaContent">
+							<tpl id="proItem">
+								<div class="proItem {disabled}">
+									<span class="text">{proName}</span>
+									<span class="ver">{proVer}</span>
+								</div>
+							</tpl>
+							<a class="addProBtn" data-href="$ov.addProduct" data-key="{plaName}"></a>
+						</div>
+					</div>
+				</tpl>
+			</li>
+		</tpl>
+	</ul>
+</tpl>
+<script>
+function showPla(){
+	overCaller("getPlaData", {}, function(data){
+		$X('ovPla').innerHTML = t_plaOverview.renderData("", {panels : getPlaPanels($XP(data, "levels", []))}); //给panels传入数组数据填充
+		var margin = ($(".pla-container").height() - $(".plaContainer").height()*3)/4;
+		$(".plaContainer").css("margin-bottom", margin);
+		$(".plaContainer:first").css("margin-top", margin);
+	});
+}
+function getPlaPanels(data){
+	var panelDatas = data;
+	return IX.map(panelDatas, function(panelData, index){
+		var plaItem = getPlaItem($XP(panelData, "platforms", []));
+		return {
+			levelName : $XP(panelData, "levelname", ""),
+			showPager : plaItem.length > 1 ? "" : "hide",
+			pagerItem : IX.map(plaItem, function(item,index){
+				return {
+					activeClz : index === 0 ? "active" : ""
+				};
+			}),
+			contentHTML : getPlaBar(plaItem)
+		};
+	});
+}
+function getPlaItem(data){ //根据固定承载宽度计算得出每层中的ul中li数量以及li中承载的数据
+	var plaItem = [];
+	var totalWidth = 0;
+	var arr = [];
+	IX.map(data, function(item,index){
+		var products = $XP(item, "products", []);
+		var width = totalWidth;
+		if(products.length){
+			width += products.length * (95+15) + 86 + 2 + 20;
+		}else{
+			width += 151 + 20;
+		}
+		if(width - 15 < 1158){
+			arr.push(item);
+			totalWidth = width;
+		}else{
+			plaItem.push(arr);
+			totalWidth = 0;
+			arr = [];
+			arr.push(item);
+		}
+		if(index === data.length - 1 && arr.length !== 0) plaItem.push(arr);
+	});
+	return plaItem;
+}
+function getPlaBar(plaItem){
+	return t_plaBar.renderData("", {
+		width : plaItem.length*1158,
+		plaItem : IX.map(plaItem, function(item,index){
+			return {
+				plaBox : IX.map(item, function(plaItems,plaIndex){
+					return {
+						plaName : $XP(plaItems, "name", ""),
+						lastClz : plaIndex === item.length - 1 ? "last" : "",
+						proItem : IX.map(plaItems.products, function(proItems,proIndex){
+							return {
+								proName : $XP(proItems, "name", ""),
+								proVer : $XP(proItems, "version", ""),
+								disabled : $XP(proItems, "proFlag", 0) ? "" : "disabled"
+							};
+						})
+					};
+				})
+			};
+		})
+	});
+}
+</script>
+<script>
+function switchOut(){
+	if(wave){
+		var timer = wave.getTimer();
+		if(timer){
+			clearInterval(timer);
+			timer = null;
+		}
+	}
+	if (!updateIndicsInterval)
+		return;
+	clearInterval(updateIndicsInterval);
+	updateIndicsInterval = null;
+}
+
+IX.ns("SDV.Overview");
+SDV.Overview.init = function(pageCfg, pageParams, cbFn){
+	pageCfg.switchOut = switchOut;
+	userType = SDV.Env.getUserType();
+	$X('body').innerHTML = t_overview.renderData("",{
+		ovBackground : SDV.Global.ovbgUrl,
+		panelActiveClz : "active",
+		sysActiveClz : "",
+		plaActiveClz : ""
+	});
+	overCaller("getOverView", {}, function(data){
+		if(!$XH.hasClass(document.body, "overview")) return;
+		var servInfo = $XP(data, "serviceCountInfo", {});
+		$X('ovFoot4Panels').innerHTML = t_ovfoot.renderData("",{
+			totalName : footCfg.overview.total,
+			stopedName : footCfg.overview.stoped,
+			total : $XP(servInfo, "total"),
+			active : $XP(servInfo, "active"),
+			stoped : $XP(servInfo, "stoped"),
+			error : $XP(servInfo, "error")
+		});
+		$X('ovPanels').innerHTML = t_panelsContainer.renderData("", {panels : getPanels($XP(data, "product"), [])}) ;
+		// jQuery(".remove.first").bind("animationend", function(){
+		// 	//jQuery(".ROFS.one").addClass("hasAinmate");
+		// 	jQuery(".remove.second").addClass("hasAinmate");
+		// 	jQuery(".remove.three").addClass("hasAinmate");
+		// });
+		if(jQuery("#ovPanels").height() < 700){
+			var marginTop = (700 - jQuery("#ovPanels").height())/2;
+			jQuery("#ovPanels").css("marginTop", marginTop > 15 ? marginTop : 15);
+		}else{
+			jQuery("#ovPanels").css("marginTop", 15);
+		}
+		jQuery(".ov-container .circle").hover(function(){
+			var contentEl = $XH.ancestor(this, "content");
+			if(!$XH.hasClass(contentEl, "disable"))
+				$XH.addClass(this, "hover");
+		},function(){
+			$XH.removeClass(this, "hover");
+		});
+		jQuery(".ov-container .circle").bind("click", function(){
+			var href = $XD.dataAttr(this, "href");
+			if(href) window.open(href);
+		});
+		IX.map(allInFlow,function(item){
+			if(jQuery(".panel."+item).length){
+				IX.map(inToOutFlow[item], function(to){
+					if(!jQuery(".panel."+to).length || jQuery(".panel."+to+" .content.active.disable").length){
+						jQuery(".panel."+item+" .to"+to).addClass("disable");
+					}
+				});
+			}
+		});
+	});
+	SDV.Env.onResize4Body();
+};
+</script>

@@ -1,0 +1,438 @@
+<script>
+var caller = SDV.Global.serviceCaller;
+var ixwPages = IXW.Pages;
+var serviceDialog = SDV.serviceDialog;
+var sdvDialog = SDV.Dialog;
+var hideDialog = SDV.Dialog.hide;
+var updateGridInterval = null;
+var uploadedCbHT = new IX.IListManager();
+
+var GridCfgs = {
+	service : {
+		clz : "serviceGrid",
+		columns : ["_checkbox","_no","serviceName","product","version","ip","cpuUsage","memUsage","diskUsage","flow","serviceStatus"],
+		itemPageName : "services",
+		tools : {
+			type : "service",
+			buttons : ["refresh", "add", "poweron", "poweroff","restart","delete"],
+			search : true,
+			filter : ["status","product"]
+		}
+	},
+	backup : {
+		clz : "backupGrid",
+		columns : ["_checkbox","_no", "bkService","bkIP","backupTime","cycle","recoveryTime","recoveryService","comment","bkStatus"],
+		itemPageName : "serviceBackups",
+		sortParams : {name :"backupTime", ifDown : 1},
+		tools : {
+			type : "backup",
+			buttons : ["delete"],
+			search : true,
+			filter : ["status"]
+		}
+	}
+};
+var InfoTexts = {
+	service : {
+		listCaller : "listServices"
+	},
+	backup : {
+		listCaller : "listBackups4Service"
+	}
+};
+var optionInfos = {
+	service :{
+		name : "服务",
+		deleteCaller : "deleteServices",
+	},
+	backup : {
+		name : "备份",
+		deleteCaller : "deleteBackups4Service"
+	}
+};
+</script>
+<tpl id="page">
+	<div class="card-switch">
+		<a class="{serviceClz}" data-href="services">服务</a>
+		<a class="{backupClz}" data-href="service/backups">备份</a>
+	</div>
+	<div id="gridTools" class="grid-tools"></div>
+	<div id="gridContainer"></div>
+	<img id="refreshLoading" class="loading" src="{imgUrl}">
+	<div class="test"></div>
+</tpl>
+<tpl id="uploadkey">
+	<form action="{url}" method="POST" enctype="multipart/form-data" id="key_form" name="key_form" target="key_frame">
+		<input name="serviceId" value="{value}">
+		<input type="file" id="authKey" name="authKey">
+		<input type="hidden" name="tkey" value="{tkey}">
+		<iframe name="key_frame" id="key_frame" style="display:none" src = "about:blank"></iframe>
+	</form>
+</tpl>
+<script>
+function ifInArrayStatus(status,  arr){
+	var isEnabled = false;
+	IX.map(arr, function(item){
+		if(status === item){
+			isEnabled = true;
+		}
+	});
+	return isEnabled;
+}
+function getEnabledBtns(selectedRows){
+	var status = "", arrbtnStatus=[];
+	var poweron, poweroff, restart, del;
+	IX.map(selectedRows, function(rowModel){
+		status = rowModel.get("status");
+		if(!poweron) poweron = ifInArrayStatus(status, [4]);
+		if(!poweroff) poweroff = ifInArrayStatus(status, [2]);
+		if(!restart) restart = ifInArrayStatus(status, [2]);
+		if(!del) del = true;
+	});
+	if(poweron) arrbtnStatus.push("poweron");
+	if(poweroff) arrbtnStatus.push("poweroff");
+	if(restart) arrbtnStatus.push("restart");
+	if(del) arrbtnStatus.push("delete");
+	return arrbtnStatus;
+}
+function getEnableActs(rowData){
+	var poweron, poweroff,restart,edit,upload, download;
+	var status = rowData.status;
+	var isNeedAuth = $XP(rowData, "isNeedAuth");
+	poweron = ifInArrayStatus(status, [4]);
+	poweroff = ifInArrayStatus(status, [2]);
+	restart = ifInArrayStatus(status, [2]);
+	edit = ifInArrayStatus(status, [4]);
+	return {
+		"poweron" : poweron,
+		"poweroff" : poweroff,
+		"restart" : restart,
+		"edit" : edit,
+		isNeedAuth : isNeedAuth
+	};
+}
+function poweronFn(ids, grid){
+	caller("poweronServices", {ids : ids}, function(){
+		grid.refresh();
+	});
+}
+function poweroffFn(ids, grid){
+	caller("poweroffServices", {ids : ids}, function(){
+		grid.refresh();
+	});
+}
+function restartFn(ids, grid){
+	caller("restartServices", {ids : ids}, function(){
+		grid.refresh();
+	});
+}
+function deleteFn(type, info, grid){
+	var optInfo = optionInfos[type];
+	sdvDialog.confirm("删除"+optInfo.name, "确认删除选中的"+optInfo.name+"吗？", function(){
+		caller(optInfo.deleteCaller, {ids : info.ids}, function(){
+			hideDialog();
+			grid.refresh();
+		}, hideDialog);
+	});
+}
+function backupFn(rowModel, grid){
+	serviceDialog.backup(rowModel, function(data){
+		caller("backupService", IX.inherit({id : rowModel.getId()}, data), function(){
+			hideDialog();
+			grid.refreshGrid();
+		});
+	});
+}
+function distanceFn(rowModel, grid){
+	serviceDialog.showVNC(rowModel.getId());
+}
+
+function uploadFn(rowModel){
+	var tkey = IX.id();
+	jQuery("#body").append(t_uploadkey.renderData("", {
+		url : SDV.Global.uploadKeyUrl + "?tkey="+tkey,
+		tkey : tkey,
+		value : rowModel.getId()
+	}));
+	$X('key_form').querySelectorAll('input[type="file"]')[0].click();
+	$X('key_form').onchange = function(){
+		submitUpload();
+	};
+	function submitUpload(){
+		uploadedCbHT.register(tkey, function(retData){
+			$X('key_form').remove();
+			switch(retData.retCode){
+				case 0 :
+					SDV.Dialog.alert(retData.err);
+					break;
+				case -1 :
+					SDV.Env.clearSession();
+					break;
+				default :
+					return /*cbFn(retData.data)*/;
+			}
+		});
+		$X('key_form').submit();
+	}
+}
+function downloadFn(rowModel){
+	var form = jQuery('<form id="form" action="services/downloadKey" method="POST" style="display:none"></form>');
+	var input = jQuery('<input type="text" name="serviceId" value="'+rowModel.getId()+'">');
+	jQuery("#body").append(form);
+	form.append(input);
+	form.submit();
+	form.remove();
+}
+function recoveryFn(rowModel, grid){
+	serviceDialog.recoveryBackup(rowModel, function(data){
+		caller("revoceryBackup4Service", IX.inherit({id : rowModel.getId()}, data), function(){
+			hideDialog();
+			grid.refreshGrid();
+		}, hideDialog);
+	});
+}
+function editFn(type, rowModel, grid){
+	serviceDialog.editServcie(rowModel, function(data){
+		caller("editService", IX.inherit({id : rowModel.getId()}, data), function(){
+			hideDialog();
+			grid.refreshGrid();
+		}, hideDialog);
+	});
+}
+function showServices(type,cbFn){
+	var userType = SDV.Env.getUserType();
+	var serviceClz, backupClz, moveClz;
+	var refreshTime;
+	var hasProduct;//是否是从概况页点击进来的某种产品下的服务{product : product}
+	if(type === "service") {
+		serviceClz = "active";
+		backupClz = "";
+		moveClz = "servActive";
+		if(IX.isFn(cbFn)) hasProduct = cbFn();
+		refreshTime = 5000;
+	}else{
+		serviceClz = "";
+		backupClz = "active";
+		moveClz = "bkActive";
+		refreshTime = 3000;
+	}
+	$X('body').innerHTML = t_page.renderData("", {
+		serviceClz : serviceClz,
+		backupClz : backupClz,
+		moveClz : moveClz,
+		imgUrl : SDV.Global.refreshIntervalUrl
+	});
+	var options = IX.inherit(type === "service" ? hasProduct ? hasProduct : {product : "-1"} : {},{status : "-1"});
+	var commonTools = {
+		service : ["refresh"],
+		backup : ["test"]//这个button是为了布局而设置的不显示的button
+	};
+	var gridCfg = GridCfgs[type], textInfo = InfoTexts[type];
+	gridCfg.clz = userType ? gridCfg.clz  : gridCfg.clz  +" noactionGrid";
+	gridCfg.tools.buttons = userType ? gridCfg.tools.buttons : commonTools[type];
+	var grid = new SDV.Grid.NVGrid(IX.inherit(gridCfg,{
+		container : "gridContainer",
+		actions : userType ? type === "service" ? [["poweron","运行",function(rowModel){
+			poweronFn([rowModel.getId()], grid);
+		}, "disable"],["poweroff","停止",function(rowModel){
+			poweroffFn([rowModel.getId()], grid);
+		}, "disable"],["restart","重启", function(rowModel){
+			restartFn([rowModel.getId()], grid);
+		}, "disable"], ["edit", "编辑", function(rowModel){
+			editFn(type, rowModel, grid);
+		}, "disable"],["delete", "删除", function(rowModel){
+			deleteFn(type, {ids : [rowModel.getId()], names : rowModel.get("name")}, grid);
+		}],["backup","备份",function(rowModel){
+			backupFn(rowModel, grid);
+		}],["distance","远程",function(rowModel){
+			distanceFn(rowModel);
+		}],["upload","上传key",function(rowModel){
+			uploadFn(rowModel);
+		}, "disable"],["download", "下载key",function(rowModel){
+			downloadFn(rowModel);
+		}, "disable"]] : [["recovery", "恢复备份", function(rowModel){
+			recoveryFn(rowModel, grid);
+		}],["delete", "删除", function(rowModel){
+			deleteFn(type, {ids : [rowModel.getId()], names : rowModel.get("name")}, grid);
+		}],] : [],
+		dataLoader : function(params, cbFn){
+			caller(textInfo.listCaller, IX.inherit(options, params), cbFn, function(){
+				switchOut();
+			});
+		},
+		clickOnRow : function(rowId, cellName, cellEl){
+			if(type === "backup") return;
+			ixwPages.load(ixwPages.createPath("service-info", {id : rowId}));
+		},
+		onselect : function(){
+			var enableBtns = getEnabledBtns(grid.getSelectedRows());
+			SDV.GridTools.enableTools("gridTools",false, enableBtns);
+		},
+		ifactionsEnable : function(rowData){
+			return getEnableActs(rowData);
+		}
+	}));
+	SDV.Grid.currentGrid = {
+		refresh :function(){
+			grid.refreshGrid();
+		},
+		add : function(){
+			serviceDialog.addService(function(data){
+				caller("addService", data, function(retData){
+					hideDialog();
+					grid.refreshGrid();
+					/*var isPrompt4Host = $XP(retData, "isPrompt4Host");
+					if(isPrompt4Host){
+						var serviceName = $XP(data, "service");
+						var host = $XP(retData, "host");
+						if(serviceName === "视频云存储服务PFS" || serviceName === "集群云存储存储服务ROFS"){
+							sdvDialog.alert("主机"+host+"上已部署有"+ serviceName+",请选择其他主机", function(){
+								jQuery("#nv-dialog .okbtn").removeClass("disable");
+							});
+						}else if(serviceName === "媒体转发服务FS" || serviceName === "标准媒体服务MS" || serviceName === "卡口接入服务IOD"){
+							sdvDialog.confirmAlert("提示", "主机"+host+"上已部署有"+serviceName+"，本次操作可能会降低服务性能，是否继续？", function(){
+								caller("addService", IX.inherit(data, {isCheck4Service :0, isCheck4Host : 0}), function(){
+									hideDialog();
+									grid.refreshGrid();
+								}, hideDialog);
+							}, function(){
+								jQuery("#nv-dialog .okbtn").removeClass("disable");
+							});
+						}else{
+							hideDialog();
+							grid.refreshGrid();
+						}
+					}else{
+						hideDialog();
+						grid.refreshGrid();
+					}*/
+				}, hideDialog);
+			});
+		},
+		poweron : function(){
+			var ids = [];
+			IX.map(grid.getSelectedRows(), function(rowModel){
+				if(rowModel.get("status") === 4) ids.push(rowModel.getId());
+			});
+			poweronFn(ids, grid);
+		},
+		poweroff : function(){
+			var ids = [];
+			IX.map(grid.getSelectedRows(), function(rowModel){
+				if(rowModel.get("status") === 2) ids.push(rowModel.getId());
+			});
+			poweroffFn(ids, grid);
+		},
+		restart : function(){
+			var ids = [];
+			IX.map(grid.getSelectedRows(), function(rowModel){
+				if(rowModel.get("status") === 2) ids.push(rowModel.getId());
+			});
+			restartFn(ids, grid);
+		},
+		"delete" : function(){
+			var ids = [];
+			var names = "";
+			IX.map(grid.getSelectedRows(), function(rowModel){
+				ids.push(rowModel.getId());
+				names = names +rowModel.get("name") + "、" ;
+			});
+			if(names) names = names.substring(0, names.length-1);
+			deleteFn(type, {ids : ids, names : names}, grid);
+		},
+		filter : function(_options){
+			var type = $XP(_options, "type", "status");
+			var value = $XP(_options, "key", "");
+			options[type] = value;
+			//options = _options;
+			grid.refreshGrid(0);
+		},
+		search : function(value){
+			grid.search(value);
+		}
+	};
+	if(type === "service"){
+		var defaultProduct = hasProduct ? {value : hasProduct.product} : "";
+		caller("getProducts4Filter", {}, function(filterData){
+			SDV.GridTools.showTools("gridTools", gridCfg.tools, {"filterData":filterData, "defaultData":defaultProduct}, "");
+			SDV.Env.onResize4Body();
+		});
+	}else{
+		SDV.GridTools.showTools("gridTools", gridCfg.tools);
+		SDV.Env.onResize4Body();
+	}
+	grid.show(function(){
+		if(SDV.Global.autoRefresh) updateGridInterval = setInterval(grid.refresh, refreshTime);
+	});
+	cbFn();
+}
+</script>
+<tpl id="serviceInfo">
+	<div id="pathNav"></div>
+	<div class="serviceInfo">
+		<div class="infoContainer">
+			<div class="title">{name}</div>
+			<div class="hdr"><span class="no">序号</span><span class="text">名称</span><span class="value">详细信息</span></div>
+			<div class="itemContainer"><div class="item">
+				<div><span class="no">1</span><span class="text">所属主机IP</span><span class="value">{ip}</span></div>
+				<div><span class="no">2</span><span class="text">占用CPU</span><span class="value">{occupyCpu}</span></div>
+				<div><span class="no">3</span><span class="text">虚拟CPU</span><span class="value">{virtualCpu}</span></div>
+				<div><span class="no">4</span><span class="text">内存</span><span class="value">{mem}</span></div>
+				<div><span class="no">5</span><span class="text">硬盘</span><span class="value">{disk}</span></div>
+				<div><span class="no">6</span><span class="text">新建时间</span><span class="value">{addTime}</span></div>
+			</div></div>
+		</div>
+	</div>
+</tpl>
+
+<script>
+function formatMem(mem){
+	if(mem > 1024)
+		return Math.round(mem/1024*100)/100 + "GB";
+	else return mem + "MB";
+}
+function _showServiceInfo(serviceId, type, cbFn){
+	$X('body').innerHTML = new IX.ITemplate({tpl : ['<img id="refreshLoading" class="loading" src="{imgUrl}">']}).renderData("",{
+		imgUrl : SDV.Global.refreshIntervalUrl
+	});
+	caller("getServiceInfo", {id : serviceId}, function(serviceInfo){
+		$X('body').innerHTML = t_serviceInfo.renderData("", {
+			name : $XP(serviceInfo, "name", ""),
+			ip : $XP(serviceInfo, "ip", ""),
+			occupyCpu : $XP(serviceInfo, "occupyCpu", "") + "核",
+			virtualCpu : $XP(serviceInfo, "virtualCpu", "")+ "核",
+			mem : formatMem($XP(serviceInfo, "mem", 0)),
+			disk : $XP(serviceInfo, "disk", "") + "GB",
+			addTime : $XP(serviceInfo, "addTime", "")
+		});
+		SDV.PathNav.showPathNav("pathNav", ["services"], $XP(serviceInfo, "name", ""));
+	});
+}
+function switchOut(){
+	if(!updateGridInterval) return;
+	clearInterval(updateGridInterval);
+	updateGridInterval=null;
+}
+IX.ns("SDV.Service");
+SDV.Service.keyUploadedCB= function(tkey, retData){
+	var fn = uploadedCbHT.get(tkey);
+	if(IX.isFn(fn)) fn(retData);
+};
+SDV.Service.init = function(pageCfg, pageParams, cbFn){
+	pageCfg.switchOut = switchOut;
+	var pageName = pageCfg.name;
+	var serviceId = $XP(pageParams,"id");
+	switch(pageName){
+	case "services":
+		showServices("service",cbFn);
+		break;
+	case "service-backup":
+		showServices("backup", cbFn);
+		break;
+	case "service-info":
+		_showServiceInfo(serviceId, "info", cbFn);
+		break;
+
+	}
+};
+</script>

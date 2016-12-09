@@ -1,0 +1,262 @@
+<tpl id="dropdownBox">
+	<span class="dropdown" data-type="{type}">
+		<input type="hidden" id="{id}" class="{inputClz}" type="text" value="{key}">
+		<button type="button" class="dropdown-toggle" data-toggle="dropdown">
+			<span class="value">{value}</span>
+			<span class="drop-pic"></span>
+		</button>
+		<ul class="dropdown-menu {clz}"><tpl id="availRsrcs">
+			<li class="dropdown-item" title="{title}"><a data-href="${action}" data-type="{type}" data-key="{key}">{html}</a></li>
+		</tpl></ul>
+	</span>
+</tpl>
+<tpl id="pageDpBox">
+	<span class="dropdown pageDp" data-type="{type}">
+		<input type="hidden" id="{id}" class="{inputClz}" type="text" value="{key}">
+		<button type="button" class="dropdown-toggle" data-toggle="dropdown">
+			<span class="value">{value}</span>
+			<span class="drop">选择</span>
+		</button>
+		<tpl id="ulItems"><ul class="dropdown-menu {clz}" data-key="{key}"><tpl id="availRsrcs">
+			<li class="dropdown-item" title="{title}"><a data-href="$dropdownBox.chose" data-type="{type}" data-key="{key}">{html}</a></li>
+		</tpl></ul></tpl><div class="dp-footer">{paginHTML}</div>
+	</span>
+</tpl>
+<script>
+function isInputNull(el, dropdownEl){
+	var value = el.value;
+	$XH[value ? "removeClass" : "addClass"](dropdownEl, "requiredMark");
+	return value;
+}
+function bindonDropdown(el){
+	var dropdownEl = $XH.first($XH.ancestor(el, "dropdown"), "dropdown-toggle");
+	IX.bind(dropdownEl, {
+		blur : function(e){
+			setTimeout(function(){isInputNull(el, dropdownEl);}, 150);
+		}
+	});
+}
+function prevent(e){
+	IX.Util.Event.preventDefault(e);
+}
+function bindOnMouseWheel(contentEl){
+	IX.bind(document.body, {
+		mousewheel : prevent
+	});
+	var dropdownMenu = jQuery(contentEl).find("ul.dropdown-menu");
+	IX.map(dropdownMenu, function(item){
+		IX.bind(item, {
+			mousewheel : function(e){
+				e = e || window.event;
+				IX.Util.Event.stopPropagation(e);
+				var delta = 0;
+				if(e.wheelDelta){
+					delta = e.wheelDelta;
+				}else if(e.detail){
+					delta = e.detail;
+				}
+				var scrollTop = $XH.getScroll(item).scrollTop;
+				var innerHeight = jQuery(item).innerHeight();
+				if((scrollTop === 0 && delta > 0) || (innerHeight +scrollTop >=item.scrollHeight && delta <0)){
+					IX.Util.Event.preventDefault(e);
+					return false;
+				}
+			}
+		});
+	});
+}
+var globalActionConfig = IXW.Actions.configActions;
+//普通的dropdownBox
+//下拉框，弹框和页面的筛选共用。
+/*
+填写默认值，若baseInfo中有定义，则覆盖默认值，可以避免baseInfo没有该值，导致不能正确渲染。
+baseInfo :{//id,inputClz一般是弹框的下拉框中需要设置
+	id,//输入框的id，用于提交表单时获取输入框中的值
+	inputClz,//输入框的一些限制，用于表单限制的验证，包括required, num, numLimit,textLimit
+	type,//同一页面存在多个时，用于区分下拉框属于哪个
+	value//下拉框默认值
+}
+data : [
+	{id, name},... 或者name1,name2,...
+]
+action : 默认为dropdownBox.chose || 自定义的action
+*/
+function getRsrcHTML(baseInfo, data, action){
+	var availRsrc = IX.map(data, function(item){
+		var name = "", key="", title="";
+		var other = "";
+		if(typeof item === "object"){
+			name = $XP(item, "name", "");
+			key = IX.isEmpty($XP(item, "id")) ? name :$XP(item, "id");
+			title = $XP(item, "title") ? $XP(item, "title") : name;
+		}else{
+			name = item;
+			key = item;
+		}
+		return {
+			html : name,
+			title : title,
+			key : key,
+			action : action ? action : "dropdownBox.chose"
+
+	};});
+	var clz = $XP(baseInfo, "clz", "");
+	return t_dropdownBox.renderData("",IX.inherit({
+		type : "",
+		id : "",
+		clz : clz,
+		value : "",
+		key : "",
+	},baseInfo, {
+		availRsrcs : availRsrc
+	}));
+}
+//分页的dropdownBox
+function getPageHTML(baseInfo, data){
+	var availRsrc=[];
+	var ulItems = IX.map(data, function(ul, index){
+		availRsrc = IX.map(ul, function(item){
+			var name = "", key="";
+			name = item;
+			key = item;
+			return {
+				html : name,
+				title : name,
+				key : key
+		};});
+		return {
+			clz : index === 0 ? "active" : "",
+			key : index +1,
+			availRsrcs : availRsrc
+		};
+	});
+	var inst = new IXW.Lib.Pagination({
+		id : "dp-pagin",
+		total : 0,
+		current : 0
+	});
+	inst.apply(0, data.length);
+	inst.bind(function(pageNo,clickFn, e){//clickFn没用
+		inst.apply(pageNo, data.length);
+		var pageDpEl =$XH.ancestor($X('dp-pagin'), "pageDp");
+		$XH.removeClass($XH.first(pageDpEl, "active"), "active");
+		IX.map(jQuery(pageDpEl).find(".dropdown-menu"), function(item){
+			var key = $XD.dataAttr(item, "key");
+			if(key-1 === pageNo){
+				$XH.addClass(item, "active");
+			}
+		});
+		e.stopPropagation();
+
+	});
+	return t_pageDpBox.renderData("",IX.inherit({
+		type : "",
+		id : "",
+		value : "",
+		key : "",
+	},baseInfo, {
+		ulItems : ulItems
+	}, {
+		paginHTML : inst.getHTML()
+	}));
+}
+globalActionConfig([["dropdownBox.chose", function(params, el){
+	var dropdownEl = $XH.ancestor(el, "dropdown");
+	if(!dropdownEl) return;
+	$XH.removeClass($XH.first(dropdownEl, "dropdown-toggle"), "requiredMark");
+	var value = el.innerHTML === "空" ? "" :el.innerHTML;
+	var key = $XD.dataAttr(el, "key", "");
+	var valueEl = $XH.first($XH.first(dropdownEl, "dropdown-toggle"), "value");
+	var inputEl = $XD.first(dropdownEl, "input");
+	inputEl.value = key;
+	valueEl.innerHTML = value;
+}]]);
+function compare(){
+	var cpuEl = $X('dlgOccupyCpu'), vcpuEl = $X('dlgVirtualCpu');
+	var num =parseInt(vcpuEl.value) - parseInt(cpuEl.value *100);
+	$XH[num>0 ? "addClass":"removeClass"](vcpuEl, "morelimit");
+}
+function isNum(el){
+	IX.bind(el, {
+		keypress : function(e){
+			var value = el.value;
+			if(e.keyCode<48 || e.keyCode>57){
+				e.returnValue = false;
+			}
+		},
+		keyup : function(e){
+			el.value = el.value.replace(/\D/g, '');
+			if($XH.hasClass(el, "compareNum")) compare();
+		}
+	});
+}
+function numLimit(el, min, quota, cbFn){
+	IX.bind(el, {
+		blur : function(){
+			min = parseInt($XD.dataAttr(el, "min",1));
+			quota = parseInt($XD.dataAttr(el, "quota",1));
+			//if(!isNaN(quota))
+			$XH[(parseInt(el.value)< min || (!isNaN(quota) ? parseInt(el.value)>quota : false ) )? "addClass" : "removeClass"](el, "morelimit");
+			if(IX.isFn(cbFn)) cbFn();
+		}
+	});
+}
+function textLimit(el){
+	IX.bind(el, {
+		blur : function(){
+			var reg = /^([\w@.\/＠．＿\／]|[\u4E00-\u9FA5]){1,18}$/;
+			var isFitted = reg.test(el.value);
+			if((!isFitted && el.value !=="")){
+				$XH.addClass(el, "morelimit");
+			}else{
+				$XH.removeClass(el, "morelimit");
+			}
+			return el.value;
+		}
+	});
+}
+</script>
+<tpl id="input">
+	<input id="{id}" name="{id}" class="{inputClz}" type="text" data-min="{min}" data-quota = "{quota}" value = "{value}">
+</tpl>
+<script>
+IX.ns("SDV.inputBox");
+SDV.inputBox.dropdownBox = function(){
+	return {
+		getHTML : getRsrcHTML,
+		bindOnMouseWheelAndHover : bindOnMouseWheel,
+		bindonDropdown : bindonDropdown,
+		isInputNull : isInputNull
+	};
+};
+SDV.inputBox.pageDpBox = function(){
+	return {
+		getHTML : getPageHTML
+	};
+};
+SDV.inputBox.inputBox = function(){
+	return {
+		getHTML : function(baseInfo, value, min){
+			return t_input.renderData("",IX.inherit(baseInfo, {value : IX.isEmpty(value) ? "" : value}, min ? {min : min} : {}));
+		},
+		isInputNull : function(el){
+			IX.bind(el, {
+				blur : function(){
+					var value = el.value;
+					$XH[value ? "removeClass" : "addClass"](el, "requiredMark");
+					return value;
+				}
+			});
+		},
+		isNum : function(el){
+			isNum(el);
+		},
+		numLimit : numLimit,
+		textLimit : function(el){
+			textLimit(el);
+		}
+
+	};
+};
+
+</script>

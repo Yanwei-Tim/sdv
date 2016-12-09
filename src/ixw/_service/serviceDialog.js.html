@@ -1,0 +1,974 @@
+<script>
+var caller = SDV.Global.serviceCaller;
+var sdvDialog = SDV.Dialog;
+var showDialog = SDV.Dialog.show;
+var hideDialog = SDV.Dialog.hide;
+var globalActionConfig = IXW.Actions.configActions;
+var dropdownBox = SDV.inputBox.dropdownBox();
+var inputBox = SDV.inputBox.inputBox();
+var productHT = IX.IListManager(), versionHT = IX.IListManager(), serviceHT = IX.IListManager(), hostHT = IX.I1ToNManager();
+var distanceUrl;
+var ips=[];
+var hosts=[];
+var productConst = SDV.Const.ProductInfo;
+var hostRestRsc={}, origHostRestRsc = {};
+</script>
+<tpl id="addServicePart">
+	<div class="contentRow">
+		<span class="label">产品</span>{productHTML}<span class='mark'>*</span>
+	</div>
+	<div class="version contentRow opacity">
+		<span class="label">版本</span>{versionHTML}<span class='mark'>*</span>
+		<div class="rowMask"></div>
+	</div>
+	<div class="service contentRow opacity">
+		<span class="label">服务</span>{serviceHTML}<span class='mark'>*</span>
+		<div class="prompt centerRed {hideClz}"></div>
+		<div class="rowMask"></div>
+	</div>
+</tpl>
+<tpl id="addService4OVPart">
+	<input type="hidden" id="dlgProduct" value = "{pValue}">
+	<input type="hidden" id="dlgVersion" value = "{vValue}">
+	<input type="hidden" id="dlgService" value = "{sValue}">
+</tpl>
+<tpl id="addService">
+	<div class="container-body active">{partHTML}
+		<div class="contentRow addBtn1 {opacityClz}">
+			<span class="label">IP地址</span><a class="addBtn" data-href="$serviceDialog.addIP">添加</a><span class='mark'>*</span>
+			<div class="rowMask"></div>
+		</div>
+		<div class="ipsAndHosts">{addedIPsHTML}</div>
+		<div class="contentRow addBtn2 hide">
+			<span class="label"></span><a class="addBtn" data-href="$serviceDialog.addIP">添加</a>
+		</div>
+		<div class="ConfigDetail opacity {hideClz}" id="dlgConfigDetail">{configDetailHTML}<div class="rowMask"></div></div>
+		<div class="rscConfig contentRow {hideClz}">
+			<input type="hidden" id="dlgRscConfig" value="0">
+			<div class="default">
+				<a data-href="$check.select" data-key = "0" ><span class="checkbox selected"></span></a><span class="text">默认</span>
+			</div>
+			<div class="custom">
+				<a data-href="$check.select" data-key = "1"><span class="checkbox"></span></a><span class="text">自定义</span>
+			</div>
+		</div>
+	</div>
+	<div class="container-addition">{additionHTML}</div>
+</tpl>
+<tpl id="addedIPsContainer"><tpl id="addedIPs"><div class="group">
+	<div class="ip contentRow">
+		<input id="dlgIp-{idNum}" type="hidden" value="{value}">
+		<span class="label">IP（{num}）</span><span class="value">{value}</span>
+		<a class='pic-close' data-href='$ip.delete' data-key="value"></a>
+	</div>
+	<div class="host contentRow">
+		<span class="label">所属主机</span>{hostHTML}<span class='mark'>*</span>
+	</div></div>
+</tpl></tpl>
+<tpl id="availRsrcsContainer"><tpl id="availRsrcs">
+	<li class="dropdown-item" title="{title}"><a data-href="$serviceDialog.chose"  data-key="{key}">{html}</a></li>
+</tpl></tpl>
+<tpl id="ipsContainer"><tpl id="availIps">
+	<li id="menu-{value}"><a class="checkbox" data-href="$ip.select" data-key="{value}"></a><span>{value}</span></li>
+</tpl></tpl>
+<tpl id="editService"><div class="ConfigDetail">{configDetailHTML}</div></tpl>
+<tpl id="ConfigDetail">
+	<div class="contentRow">
+		<span class="label">占用CPU</span>{occupyCpu}核<span class='mark'>*</span><span class="prompt">{pmt4occupyCpu}</span>
+	</div>
+	<div class="contentRow">
+		<span class="label">虚拟CPU</span>{virtualCpu}核<span class='mark'>*</span><span class="prompt">{pmt4virutalCpu}</span>
+	</div>
+	<div class="contentRow">
+		<span class="label">内存</span>{mem}GB<span class='mark'>*</span><span class="prompt">{pmt4mem}</span>
+	</div>
+	<div class="contentRow">
+		<span class="label">硬盘</span>{disk}GB<span class='mark'>*</span><span class="prompt">请输入大于等于 {min} 的数值</span>
+	</div>
+</tpl>
+
+<tpl id="recovery">
+	<div class="prompt {hideClz}" style="color:#ffba00"><span class="ico-prompt"></span>全量备份恢复，运行中的服务会自动关机</div>
+	<div class="contentRow">
+		<span class="label">恢复对象</span>{recoveryObjHTML}<span class='mark'>*</span>
+	</div>
+</tpl>
+<tpl id="vncDialog">
+	<div class="vncbtns">
+		<a class="r clostbtn" data-href="$serviceDialog.close"></a>
+		<a id="openInNewWindow" class="r" target="_blank" title="在新窗口打开" data-href="$serviceDialog.close">新窗口打开</a>
+	</div>
+	<div class="content"><iframe id="vncframe" src="{url}"></iframe></div>
+</tpl>
+<tpl id="backup">
+	<input type="hidden" id="dlgServStaus" value = "{value}">
+	<div class="bkway prompt hide" style="color:#ffba00"><span class="ico-prompt"></span>全量备份，运行中的服务会自动关机</div>
+	<div class="contentRow">
+		<span class="label">备份时间</span>{bkTimeHTML}
+	</div>
+	<div class="contentRow">
+		<span class="label">备份周期</span>{bkCycleHTML}天
+	</div>
+	<div class="contentRow">
+		<span class="label">备注</span><textarea id="dlgComment"></textarea>
+	</div>
+</tpl>
+<script>
+var serviceCfg = {
+	product : {id : "dlgProduct", inputClz : "required", type : "product"},
+	version : {id : "dlgVersion", inputClz : "required",type : "version"},
+	service : {id : "dlgService", inputClz : "required", type : "service"},
+	ip : {id : "dlgIp", inputClz : "required"},
+	host : {id : "dlgHost", inputClz : "required", type : "host"},
+	occupyCpu : {id : "dlgOccupyCpu", inputClz : "required num numLimit rscLimit", quota : 8, min :1},
+	virtualCpu : {id : "dlgVirtualCpu", inputClz : "required num numLimit", quota : 8, min :1},
+	mem : {id : "dlgMem", inputClz : "required num numLimit rscLimit", quota : 8, min :1},
+	disk : {id : "dlgDisk", inputClz : "required num numLimit rscLimit",quota : "无穷大", min :1},
+	recovery : {id : "dlgRecovery", inputClz : "required", type : "recovery",  value : "本机"},
+	bkway : {id : "dlgBkWay", type : "backup", inputClz : "required"},
+	bkCycle : {id : "dlgBkCycle", inputClz : "num"}
+};
+var range4cfg = {//根据os
+	0 : {
+		occupyCpu : {text : "请输入 1-16 之间的数值", num : 16},
+		virtualCpu : {text : "虚拟CPU不超过占用CPU的100倍", num : "倍数"},
+		mem : {text : "请输入 1-32 之间的数值", num :32}
+	},
+	1 : {
+		occupyCpu : {text : "请输入 1-4 之间的数值", num :4},
+		virtualCpu : {text : "请输入 1-4 之间的数值", num :4},
+		mem : {text : "请输入 1-4 之间的数值", num :4}
+	},
+	2 : {
+		occupyCpu : {text : "请输入 1-8 之间的数值", num : 8},
+		virtualCpu : {text : "请输入 1-8 之间的数值", num : 8},
+		mem : {text : "请输入 1-8 之间的数值", num : 8}
+	}
+};
+function resizeBodyEl(){
+	var bodyEl = jQuery("#nv-dialog .ixw-body")[0];
+	var containerBodyEl =jQuery(bodyEl).find(".container-body");
+	var areaEl = $(bodyEl).find(".area");
+	if(containerBodyEl.height() > 500 && !$(".ixw-body .container-addition").hasClass("active")){
+		areaEl.height(500);
+		areaEl.css("overflow","auto");
+	}else{
+		areaEl.height("auto");
+		areaEl.css("overflow","visible");
+	}
+	var posY = ($Xw.getScreen().size[1]- bodyEl.offsetHeight)/2;
+	posY = posY > 300? (posY-100): Math.max(posY, 0);
+	bodyEl.style.marginTop = (0- bodyEl.offsetHeight- posY) + "px";
+}
+function getConfigDetailHTML(type, info){
+	var occupyCpu, virtualCpu, mem, disk, pmt4occupyCpu="", pmt4virutalCpu = "",pmt4mem = "",min =1;
+	if(type){
+		var os = $XP(info, "os");
+		var clz = "required num numLimit";
+		if(os === 0) clz = "required num numLimit compareNum";
+		occupyCpu = inputBox.getHTML(IX.inherit(serviceCfg.occupyCpu, {quota : range4cfg[os].occupyCpu.num, inputClz : clz}),$XP(info, "occupyCpu"));
+		virtualCpu = inputBox.getHTML(IX.inherit(serviceCfg.virtualCpu, {quota : range4cfg[os].virtualCpu.num, inputClz : clz}),$XP(info, "virtualCpu"));
+		mem = inputBox.getHTML(IX.inherit(serviceCfg.mem, {quota : range4cfg[os].mem.num}),$XP(info,"mem"));
+		disk = inputBox.getHTML(serviceCfg.disk,$XP(info,"disk"), type === "edit" ? $XP(info,"disk") : "");
+		pmt4occupyCpu  = range4cfg[os].occupyCpu.text;
+		pmt4virutalCpu = range4cfg[os].virtualCpu.text;
+		pmt4mem = range4cfg[os].mem.text;
+		if(type === "edit") min = $XP(info,"disk");
+	}else{
+		occupyCpu = inputBox.getHTML(serviceCfg.occupyCpu);
+		virtualCpu = inputBox.getHTML(serviceCfg.virtualCpu);
+		mem = inputBox.getHTML(serviceCfg.mem);
+		disk = inputBox.getHTML(serviceCfg.disk);
+	}
+	return t_ConfigDetail.renderData("", {
+		occupyCpu : occupyCpu,
+		virtualCpu : virtualCpu,
+		mem : mem,
+		disk : disk,
+		pmt4occupyCpu : pmt4occupyCpu,
+		pmt4virutalCpu : pmt4virutalCpu,
+		pmt4mem : pmt4mem,
+		min : min
+	});
+}
+//更新页面信息
+function updatePage(type,el, oldValue){
+	var areaEl = $XH.ancestor(el, "area");
+	var ipsAndHostsEl  = jQuery(areaEl).find(".ipsAndHosts");
+	var pname, vname;
+	if($X('dlgProduct')) pname = $X('dlgProduct').value;
+	if($X('dlgVersion')) vname = $X('dlgVersion').value;
+	hostRestRsc = jQuery.extend(true, {}, origHostRestRsc);
+	if(type === "product"){
+		jQuery(areaEl).find(".version").removeClass("opacity");
+		jQuery(areaEl).find(".version .dropdown-menu").html(getAvailList(productHT.get(pname)));
+	}else if(type === "version"){
+		jQuery(areaEl).find(".service").removeClass("opacity");
+		jQuery(areaEl).find(".service .dropdown-menu").html(getAvailList(versionHT.get(pname+"-"+vname)));
+	}else if(type === "service"){
+		jQuery(areaEl).find(".ConfigDetail").removeClass("hide");
+		jQuery(areaEl).find(".rscConfig").removeClass("hide");
+		jQuery(areaEl).find(".addBtn1").removeClass("opacity");
+		jQuery(areaEl).find(".service .prompt").html("").addClass("hide");
+	}
+	if(oldValue){
+		ipsAndHostsEl.html("");
+		jQuery(areaEl).find(".addBtn1").removeClass("hide");
+		jQuery(areaEl).find(".addBtn2").addClass("hide");
+		if(type !=="service"){
+			jQuery(areaEl).find(".ConfigDetail").addClass("hide");
+			jQuery(areaEl).find(".rscConfig").addClass("hide");
+			$X('dlgService').value ="";
+			jQuery(areaEl).find(".service .dropdown-toggle .value").html("");
+			jQuery(areaEl).find(".addBtn1").addClass("opacity");
+			if(type === "product"){
+				jQuery(areaEl).find(".service").addClass("opacity");
+				$X('dlgVersion').value ="";
+				jQuery(areaEl).find(".version .dropdown-toggle .value").html("");
+				jQuery(".area .service .prompt").html("").addClass("hide");
+			}
+		}else{
+			jQuery(areaEl).find(".ConfigDetail").addClass("opacity");
+		}
+	}
+}
+globalActionConfig([["serviceDialog.chose", function(params, el){
+		var dropdownEl = $XH.ancestor(el, "dropdown");
+		if(!dropdownEl) return;
+		var value = el.innerHTML;
+		var key =params.key;
+		var type = $XD.dataAttr(dropdownEl, "type");
+		var valueEl = $XH.first($XH.first(dropdownEl, "dropdown-toggle"), "value");
+		var inputEl = $XD.first(dropdownEl, "input");
+		if(inputEl.value === value || inputEl.value === key) return;
+		var oldValue = inputEl.value;//下拉框选择之前选中的值
+		inputEl.value =key;
+		valueEl.innerHTML = value;
+		var pname, vname,sname, ipsAndHostsEl;
+		if(type === "product"){
+			updatePage(type, el, oldValue);
+			resizeBodyEl();
+		}else if(type === "version"){
+			updatePage(type, el, oldValue);
+			resizeBodyEl();
+		}else if(type === "service"){
+			updatePage(type, el, oldValue);
+			var isCheck=0;
+			pname = $X('dlgProduct').value;
+			vname = $X('dlgVersion').value;
+			sname = $X('dlgService').value;
+			var condition1 = pname === productConst[0].name && (sname === productConst[0].services[1] || sname === productConst[0].services[2] || sname === productConst[0].services[3]);
+			var condition2 = pname === productConst[1].name && (sname === productConst[1].services[0] || sname === productConst[1].services[2]);
+			var condition3 = pname === productConst[2].name && sname === productConst[2].services[3];
+			var condition4 = pname === productConst[3].name && (sname === productConst[3].services[0] || sname === productConst[3].services[1]);
+			if(condition1 || condition2 || condition3 || condition4) isCheck = 1;
+			if(isCheck){
+				caller("checkNeedOther", {product : pname, version : vname, service : sname}, function(data){
+					var isPrompt = $XP(data, "isPrompt");
+					if(isPrompt){
+						var names = $XP(data, "names",[]).join("和");
+						var promptMsg = "系统中还未创建" + names + ",会影响"+sname+"部分功能的使用!";
+						var contentRowEl = $XH.ancestor(el, "contentRow");
+						var promptEl = $XH.first(contentRowEl, "prompt");
+						if(promptEl) {promptEl.innerHTML = promptMsg; $XH.removeClass(promptEl, "hide");}
+					}
+				});
+			}
+			var cfg = serviceHT.get(pname+"-"+vname +"-"+value);
+			var os = $XP(cfg, "os",0);
+			var dlgOccupyCpuEl = $X('dlgOccupyCpu');
+			var dlgVirtualCpuEl = $X('dlgVirtualCpu');
+			var dlgMemEl = $X('dlgMem');
+			var dlgDiskEl= $X('dlgDisk');
+			//修改默认的配置项
+			dlgOccupyCpuEl.value = $XP(cfg, "occupyCpu");
+			dlgVirtualCpuEl.value = $XP(cfg, "virtualCpu");
+			dlgMemEl.value = $XP(cfg, "mem");
+			dlgDiskEl.value = $XP(cfg, "disk");
+			//修改提示数字限制信息，以及更新quota值
+			var cpuText= range4cfg[os].occupyCpu.text;
+			var cpuNum = range4cfg[os].occupyCpu.num;
+			var memText = range4cfg[os].mem.text;
+			var memNum = range4cfg[os].mem.num;
+			var VcpuText = range4cfg[os].virtualCpu.text;
+			var VcpuNum =  range4cfg[os].virtualCpu.num;
+			var promptEl4occupyCpu = $XH.first($XH.ancestor(dlgOccupyCpuEl, "contentRow"), "prompt");
+			var promptEl4virtualCpu = $XH.first($XH.ancestor(dlgVirtualCpuEl, "contentRow"), "prompt");
+			var promptEl4mem = $XH.first($XH.ancestor(dlgMemEl, "contentRow"), "prompt");
+			promptEl4occupyCpu.innerHTML = cpuText;
+			promptEl4virtualCpu.innerHTML = VcpuText;
+			promptEl4mem.innerHTML = memText;
+			$XD.setDataAttr(dlgOccupyCpuEl, "quota", cpuNum);
+			$XD.setDataAttr(dlgVirtualCpuEl, "quota", VcpuNum);
+			$XD.setDataAttr(dlgMemEl, "quota", memNum);
+			if(os ===0){
+				$XH.addClass(dlgOccupyCpuEl, "compareNum");
+				$XH.addClass(dlgVirtualCpuEl, "compareNum");
+			}else{
+				$XH.removeClass(dlgOccupyCpuEl, "compareNum");
+				$XH.removeClass(dlgVirtualCpuEl, "compareNum");
+			}
+			IX.map(jQuery(".area .ConfigDetail input.morelimit"), function(item){
+				$XH.removeClass(item, "morelimit");
+			});
+			IX.map(jQuery(".area .ConfigDetail input.requiredMark"), function(item){
+				$XH.removeClass(item, "requiredMark");
+			});
+			//保存默认值
+			var defaultAEl = jQuery(".rscConfig .default a")[0];
+			jQuery(defaultAEl).find(".checkbox").addClass("selected");
+			$XD.setDataAttr(defaultAEl, "occupyCpu", $XP(cfg, "occupyCpu"));
+			$XD.setDataAttr(defaultAEl, "virtualCpu", $XP(cfg, "virtualCpu"));
+			$XD.setDataAttr(defaultAEl, "mem", $XP(cfg, "mem"));
+			$XD.setDataAttr(defaultAEl, "disk", $XP(cfg, "disk"));
+			//保存初始化自定的值
+			var customAEl = jQuery(".rscConfig .custom a")[0];
+			jQuery(customAEl).find(".checkbox").removeClass("selected");
+
+			$XD.setDataAttr(customAEl, "occupyCpu", $XP(cfg, "occupyCpu"));
+			$XD.setDataAttr(customAEl, "mem", $XP(cfg, "mem"));
+			$XD.setDataAttr(customAEl, "disk", $XP(cfg, "disk"));
+			resizeBodyEl();
+		}else if(type === "host"){
+			valueEl.innerHTML = key;
+			pname = $X('dlgProduct').value;
+			vname = $X('dlgVersion').value;
+			sname = $X('dlgService').value;
+			ipsAndHostsEl = $XH.ancestor(el, "ipsAndHosts");
+			var inputs = jQuery(ipsAndHostsEl).find(".dropdown input");
+			var isContinue = true;
+			var isDeployed;
+			if(sname === productConst[5].services[0] || sname === productConst[7].services[0]){
+				if(!inputs.length) return;
+				caller("checkIsDeployed", {product : pname, version : vname, service : sname, host : key}, function(data){
+					isDeployed = $XP(data, "isDeployed");
+					if(isDeployed){
+						isContinue = false;
+						sdvDialog.alert("主机上"+key+"已部署了"+sname+"，请选择其他主机", function(){
+							inputEl.value = "";
+							valueEl.innerHTML = "";
+						});
+					}else{
+						IX.map(inputs, function(item){
+							if(!jQuery(item).is(jQuery(inputEl))){
+								if(item.value === inputEl.value){
+									isContinue = false;
+									sdvDialog.alert("主机"+key+"上已选择了部署"+sname+"，请选择其他主机", function(){
+										inputEl.value = "";
+										valueEl.innerHTML = "";
+									});
+								}
+							}
+						});
+					}
+					if(isContinue) updateHostRscInfo(el, oldValue);
+				});
+			}else if(sname === productConst[6].services[1] || sname === productConst[6].services[2] || sname === productConst[0].services[3]){
+				if(!inputs.length) return;
+				caller("checkIsDeployed", {name : sname}, function(data){
+					isDeployed = $XP(data, "isDeployed");
+					if(isDeployed){
+						sdvDialog.confirmAlert("提示","主机"+key+"上已部署了"+sname+"，本次操作可能会降低性能，是否继续", function(){
+								updateHostRscInfo(el, oldValue);
+							}, function(){
+								inputEl.value = "";
+								valueEl.innerHTML = "";
+							});
+					}else{
+						IX.map(inputs, function(item){
+							if(!jQuery(item).is(jQuery(inputEl))){
+								if(item.value === inputEl.value){
+									sdvDialog.confirmAlert("提示","主机"+key+"上已选择了部署"+sname+"，本次操作可能会降低性能，是否继续", function(){
+										updateHostRscInfo(el, oldValue);
+									}, function(){
+										inputEl.value = "";
+										valueEl.innerHTML = "";
+									});
+								}
+							}
+						});
+					}
+				});
+			}else{
+				updateHostRscInfo(el, oldValue);
+			}
+		}
+
+}], ["serviceDialog.close", function(){
+	hideDialog();
+}], ["check.select", function(params, el){
+	var checkEl = $XH.first(el, "checkbox");
+	if($XH.hasClass(el, "selected")) return;
+	var key = params.key;
+	var rscConfig = $XH.ancestor(el, "rscConfig");
+	jQuery(rscConfig).find(".selected").removeClass("selected");
+	$XH.addClass(checkEl, "selected");
+	jQuery(".area .ConfigDetail")[parseInt(key) ? "removeClass" : "addClass"]("opacity");
+	$X('dlgRscConfig').value = key;
+	if(!parseInt(key)){
+		$X('dlgOccupyCpu').value = $XD.dataAttr(el, "occupyCpu");
+		$X('dlgVirtualCpu').value = $XD.dataAttr(el, "virtualCpu");
+		$X('dlgMem').value = $XD.dataAttr(el, "mem");
+		$X('dlgDisk').value = $XD.dataAttr(el, "disk");
+	}else{
+		jQuery("#dlgOccupyCpu").removeClass("morelimit").removeClass("requiredMark");
+		jQuery("#dlgVirtualCpu").removeClass("morelimit").removeClass("requiredMark");
+		jQuery("#dlgMem").removeClass("morelimit").removeClass("requiredMark");
+		jQuery("#dlgDisk").removeClass("morelimit").removeClass("requiredMark");
+	}
+}], ["serviceDialog.addIP", function(params, el){
+	var areaEl = $XH.ancestor(el, "area");
+	var cBodyEL = $XH.first(areaEl, "container-body");
+	var ipsAndHostsEl = $XH.first(cBodyEL, "ipsAndHosts");
+	var cAdditionEL = $XH.first(areaEl, "container-addition");
+	var leftSideEl = $XH.first(cAdditionEL, "leftSide");
+	jQuery(leftSideEl).find("li").removeClass("hide").removeClass("added");
+	var rightSideEl = $XH.first(cAdditionEL, "rightSide");
+	IX.map(jQuery(ipsAndHostsEl).find(".group"), function(item){
+		var value = $XD.first($XH.first(item, "ip"), "input").value;
+		if(!value) return;
+		value = value.replace(/\./g, "\\.");//将.替换为\.
+		jQuery(leftSideEl).find("#menu-"+value).addClass("hide").addClass("added");
+	});
+	jQuery(leftSideEl).find("a.selected").removeClass("selected");
+
+	jQuery(rightSideEl).find("ul").html("");
+	$XH.removeClass(cBodyEL, "active");
+	$XH.addClass(cAdditionEL, "active");
+	var dlgEl = $XH.ancestor(areaEl, "ixw-body");
+	var btns = $XH.first(dlgEl, "btns");
+	$XH.addClass(btns, "hide");
+	resizeBodyEl();
+}],["ip.delete", function(params, el){
+	var groupEl = $XH.ancestor(el, "group");
+	var ipsAndHostsEl = $XH.ancestor(groupEl, "ipsAndHosts");
+	var hostEl = $XH.first(groupEl, "host");
+	var hostIp = jQuery(hostEl).find("input")[0].value;
+	if(hostIp && !$XH.first(hostEl, "prompt")){
+		var cpuValue = Number($X('dlgOccupyCpu').value);
+		var memValue = Number($X('dlgMem').value);
+		var diskValue = Number($X('dlgDisk').value);
+		hostRestRsc[hostIp].cpu +=  cpuValue;
+		hostRestRsc[hostIp].mem += memValue;
+		hostRestRsc[hostIp].disk += diskValue;
+		updatePrompt4Host(ipsAndHostsEl,hostIp);
+	}
+	jQuery(groupEl).remove();
+	IX.map(jQuery(ipsAndHostsEl).find(".group"), function(item, index){
+		jQuery(item).find(".ip .label").html("IP（"+(index +1)+"）");
+	});
+	if(ipsAndHostsEl.innerHTML === ""){
+		var areaEl = $XH.ancestor(ipsAndHostsEl, "area");
+		jQuery(areaEl).find(".addBtn1").removeClass("hide");
+		jQuery(areaEl).find(".addBtn2").addClass("hide");
+	}
+	resizeBodyEl();
+}],["bkway.chose", function(params, el){
+	var dropdownEl = $XH.ancestor(el, "dropdown");
+	if(!dropdownEl) return;
+	$XH.removeClass($XH.first(dropdownEl, "dropdown-toggle"), "requiredMark");
+	var value = el.innerHTML;
+	var key = $XD.dataAttr(el, "key", "");
+	var valueEl = $XH.first($XH.first(dropdownEl, "dropdown-toggle"), "value");
+	var inputEl = $XD.first(dropdownEl, "input");
+	inputEl.value = key;
+	valueEl.innerHTML = value;
+	var status = $X('dlgServStaus').value;
+	var areaEl = $XH.ancestor(dropdownEl, "area");
+	var promptEl = $XH.first(areaEl, "prompt");
+	if(key === "0" && status === "2"){
+		$XH.removeClass(promptEl, "hide");
+	}else{
+		$XH.addClass(promptEl, "hide");
+	}
+}]]);
+function ipSure(params, el){
+	var key=params.key;
+	var areaEl = $XH.ancestor(el, "area");
+	var cBodyEL = $XH.first(areaEl, "container-body");
+	var cAdditionEL = $XH.first(areaEl, "container-addition");
+	$XH.removeClass(cAdditionEL, "active");
+	$XH.addClass(cBodyEL, "active");
+	if(key === "ok"){
+		var addingIPs = [];//待添加
+		var ipsAndHostsEl = $XH.first(cBodyEL, "ipsAndHosts");
+		var rightSideEl = $XH.ancestor(el, "rightSide");
+		IX.map(jQuery(rightSideEl).find("ul li"), function(item){
+			var addingIP = item.id.split("-")[1];
+			addingIPs.push(addingIP);
+		});
+		jQuery(ipsAndHostsEl).append(t_addedIPsContainer.renderData("", {
+			addedIPs : IX.map(addingIPs, function(item, index){
+				var hostHTML = "";
+				hosts = [];
+				for(var o in hostRestRsc){
+					hosts.push({
+						id : o,
+						name :"<span class='item-body'>"+o+ "</span><span class='item-prompt'>剩余 CPU " + hostRestRsc[o].cpu+" 核，内存 " + hostRestRsc[o].mem + " GB,硬盘(GB) " + hostRestRsc[o].disk+ " GB</span>",
+						title : o + "剩余 CPU "+hostRestRsc[o].cpu+" 核，内存 " +hostRestRsc[o].mem+" GB，硬盘 " +hostRestRsc[o].disk+" GB"
+					});
+				}
+				hostHTML = dropdownBox.getHTML(IX.inherit(serviceCfg.host, {id : "dlgHost-"+index}), hosts, "serviceDialog.chose");
+				return {
+					idNum : index,
+					num : index +1,
+					value : item,
+					hostHTML : hostHTML
+				};
+			})
+		}));
+		$XH.addClass($XH.first(cBodyEL, "addBtn1"), "hide");
+		$XH.removeClass($XH.first(cBodyEL, "addBtn2"), "hide");
+		resizeBodyEl();
+	}
+	var dlgEl = $XH.ancestor(areaEl, "ixw-body");
+	var btns = $XH.first(dlgEl, "btns");
+	$XH.removeClass(btns, "hide");
+}
+function updateHostRscInfo(el, oldValue){
+	var dropdownEl = $XH.ancestor(el, "dropdown");
+	var valueEl = $XH.first($XH.first(dropdownEl, "dropdown-toggle"), "value");
+	var inputEl = $XD.first(dropdownEl, "input");
+	var key = $XD.dataAttr(el, "key");
+	var cpuRest4Host = Number(hostRestRsc[key].cpu);
+	var memRest4Host = Number(hostRestRsc[key].mem);
+	var diskRest4Host = Number(hostRestRsc[key].disk);
+
+	var cpuValue = Number($X('dlgOccupyCpu').value);
+	var memValue = Number($X('dlgMem').value);
+	var diskValue = Number($X('dlgDisk').value);
+
+	var hostEl = $XH.ancestor(el, "host");
+	var promptEl4Host = $XH.first(hostEl, "prompt");
+	var ipsAndHostsEl = $XH.ancestor(el, "ipsAndHosts");
+	if(oldValue){
+		hostRestRsc[oldValue].cpu += cpuValue;
+		hostRestRsc[oldValue].mem += memValue;
+		hostRestRsc[oldValue].disk += diskValue;
+		updatePrompt4Host(ipsAndHostsEl,oldValue);
+	}
+	if(cpuValue > cpuRest4Host || memValue > memRest4Host || diskValue > diskRest4Host){
+		if(promptEl4Host){
+			promptEl4Host.innerHTML = '主机'+key+'资源不足，请选择其他主机';
+		}else
+			jQuery(hostEl).append('<div class="prompt centerRed">主机'+key+'资源不足，请选择其他主机</div>');
+		inputEl.value = "";
+		valueEl.innerHTML = "";
+		return;
+	}else{
+		cpuRest4Host -= cpuValue;
+		memRest4Host -= memValue;
+		diskRest4Host -= diskValue;
+		hostRestRsc[key].cpu = cpuRest4Host;
+		hostRestRsc[key].mem = memRest4Host;
+		hostRestRsc[key].disk = diskRest4Host;
+		if(promptEl4Host) jQuery(promptEl4Host).remove();
+		updatePrompt4Host(ipsAndHostsEl,key);
+	}
+}
+function updatePrompt4Host(ipsAndHostsEl,value){
+	IX.map(jQuery(ipsAndHostsEl).find("[title^='" + value + "']"), function(item){
+		var updated = "<span class='item-body'>"+value+ "</span><span class='item-prompt'>剩余 CPU " + hostRestRsc[value].cpu+" 核，内存 " + hostRestRsc[value].mem + " GB,硬盘(GB) " + hostRestRsc[value].disk+ " GB</span>";
+		var updatedTitle = value + "剩余 CPU "+hostRestRsc[value].cpu+" 核，内存 " +hostRestRsc[value].mem+" GB，硬盘 " +hostRestRsc[value].disk+" GB";
+		jQuery(item).attr("title", updatedTitle);
+		var aEl = $XD.first(item, "a");
+		aEl.innerHTML = updated;
+	});
+}
+function getAvailList(data){
+	var availRsrcs = IX.map(data, function(item){
+		var name = $XP(item, "name", "");
+		var id = $XP(item, "id", name);
+		return {
+			title : name,
+			key : id,
+			html : name
+		};
+	});
+	return t_availRsrcsContainer.renderData("", {
+		availRsrcs : availRsrcs
+	});
+}
+function getSepratedData(info){
+	var productInfo = $XP(info, "product", []);
+	productHT.clear();
+	versionHT.clear();
+	serviceHT.clear();
+	//hostHT.clear();//重新赋值前，先清空所有值。
+	IX.map(productInfo, function(item, idx){
+		var pname = $XP(item, "name", idx);
+		var version = $XP(item, "version", []);
+		productHT.register(pname, version);
+		IX.map(version, function(item, idx){
+			var vname = $XP(item, "name", idx);
+			var service = $XP(item, "service", []);
+			versionHT.register(pname+"-"+vname, service);
+			IX.map(service, function(item, idx){
+				var sname = $XP(item, "name", idx);
+				var cfg = $XP(item, "rscConfig", {});
+				serviceHT.register(pname+"-"+vname +"-"+sname, {
+					os : $XP(item, "os"),
+					occupyCpu : $XP(cfg, "occupyCpu", ""),
+					virtualCpu : $XP(cfg, "virtualCpu", ""),
+					mem : $XP(cfg, "mem", ""),
+					disk : $XP(cfg, "disk", "")
+				});
+			});
+		});
+	});
+}
+function saveHostRscInfo(hosts){
+	IX.map(hosts, function(item){
+		var hostIp = $XP(item, "hostIp");
+		var cpu = $XP(item, "cpu");
+		var mem = $XP(item, "mem");
+		var disk = $XP(item, "disk");
+		hostRestRsc[hostIp]={cpu : cpu, mem : mem, disk:disk};
+		origHostRestRsc[hostIp] = {cpu : cpu, mem : mem, disk:disk};
+	});
+}
+function vertifyRequired(){
+	var flag = true;
+	IX.map(jQuery(".area input.required"), function(el){
+		if(el.value === ""){
+			flag = false;
+		}
+		var lastEl = el;
+		if($XH.hasClass(el.parentNode, "dropdown")){
+			lastEl = $XH.first(el.parentNode, "dropdown-toggle");
+		}
+		$XH[el.value=== "" ? "addClass" : "removeClass"](lastEl, "requiredMark");
+	});
+	IX.map(jQuery(".area input.numLimit"), function(el){
+		if($XH.hasClass(el, "morelimit")) flag = false;
+	});
+	if(jQuery(".area .addBtn1").length && !jQuery(".area .addBtn1").hasClass("hide")) flag= false;
+	return flag;
+}
+function bindOnValue(areaEl, type){
+	var inputs= null, dropdowns=null;
+	if(type === "add"){
+		dropdowns = jQuery(areaEl).find(".dropdown input.required");
+		IX.map(dropdowns, function(el){
+			dropdownBox.bindonDropdown(el);
+		});
+		inputs = jQuery(".ConfigDetail input.required");
+		IX.map(inputs, function(el){
+			inputBox.isInputNull(el);
+		});
+	}else if(type === "edit"){
+		inputs = jQuery("input.required");
+		IX.map(inputs, function(el){
+			inputBox.isInputNull(el);
+		});
+	}else{
+		dropdowns = jQuery(areaEl).find(".dropdown input.required");
+		IX.map(dropdowns, function(el){
+			dropdownBox.bindonDropdown(el);
+		});
+	}
+	var numInputs = jQuery("input.num");
+	IX.map(numInputs, function(el){
+		inputBox.isNum(el);
+	});
+	var numLimitInputs = jQuery("input.numLimit");
+	IX.map(numLimitInputs, function(el){
+		var quota = parseInt($XD.dataAttr(el, "quota",1));
+		var min = parseInt($XD.dataAttr(el, "min",1));
+		if($XH.hasClass(el, "rscLimit")){
+			inputBox.numLimit(el, min, quota, function(){
+				if($XH.hasClass(el, "morelimit")) return;
+				var customAEl = $XD.first($XH.first($XH.first($XH.ancestor(el, "container-body"), "rscConfig"), "custom"), "a");
+				var ipsAndHostsEl = $XH.first($XH.ancestor(el, "container-body"), "ipsAndHosts");
+				var customValue = 0, type;
+				if(el.id.indexOf("OccupyCpu") > -1){
+					customValue = Number($XD.dataAttr(customAEl, "occupyCpu"));
+					type = "cpu";
+				}else if(el.id.indexOf("Mem") > -1){
+					customValue = Number($XD.dataAttr(customAEl, "mem"));
+					type = "mem";
+				}else if(el.id.indexOf("Disk") > -1){
+					customValue = Number($XD.dataAttr(customAEl, "disk"));
+					type = "disk";
+				}
+				var shortHost = [];
+				var selectedHosts =[], objSelectedHosts = {};
+				IX.map(jQuery(".ipsAndHosts .group"), function(item){
+					var value = $XD.first($XH.first($XH.first(item, "host"), "dropdown"), "input").value;
+					if(value) {
+						if(!objSelectedHosts[value]) objSelectedHosts[value]=1;
+						else objSelectedHosts[value] +=1;
+					}
+				});
+				if((Number(el.value) - customValue) === 0) return;
+				var isUpdate = true;//修改完后是否所有所选主机均能满足条件
+				var restRsc = 0;
+				for(var o in objSelectedHosts){
+					restRsc = hostRestRsc[o][type];
+					if((Number(el.value) - customValue)* objSelectedHosts[o] > restRsc) {
+						isUpdate = false;
+						shortHost.push(o);
+						el.value = customValue;
+					}
+				}
+				if(isUpdate){
+					$XD.setDataAttr(customAEl, type === "cpu" ? "occupycpu" : type, el.value);
+					IX.map(jQuery(".ipsAndHosts .group"), function(item){
+						var hostIp = $XD.first($XH.first($XH.first(item, "host"), "dropdown"), "input").value;
+						if(hostIp){
+							restRsc = hostRestRsc[hostIp][type];
+							hostRestRsc[hostIp][type] = restRsc - (el.value - customValue);
+							updatePrompt4Host(ipsAndHostsEl, hostIp);
+						}
+					});
+				}else{
+					sdvDialog.alert("修改后的资源，导致"+shortHost.join("，")+"资源不足， 请重新填写！", function(){});
+				}
+			});
+		}else
+			inputBox.numLimit(el, min, quota);
+	});
+}
+function submitService(okFn, btndisableFn){
+	var flag = vertifyRequired();
+	if(flag){
+		if(IX.isFn(btndisableFn)) btndisableFn();
+		var product, version, service;
+		product = $X('dlgProduct').value;
+		version = $X('dlgVersion').value;
+		service = $X('dlgService').value;
+		var ipsAndHosts = [];
+		IX.map(jQuery(".ipsAndHosts .group"), function(item){
+			ipsAndHosts.push({
+				ip : $XD.first($XH.first(item, "ip"), "input").value,
+				host : $XD.first($XH.first($XH.first(item, "host"), "dropdown"), "input").value,
+			});
+		});
+		var rscConfig = $X('dlgRscConfig').value;
+		var occupyCpu = $X('dlgOccupyCpu').value;
+		var virtualCpu = $X('dlgVirtualCpu').value;
+		var mem = $X('dlgMem').value;
+		var disk = $X('dlgDisk').value;
+		var serviceInfo ={
+			product : product,
+			version : version,
+			service : [{
+				name : service,
+				ipsAndHosts : ipsAndHosts,
+				rscConfig : rscConfig,
+				occupyCpu : occupyCpu,
+				virtualCpu : virtualCpu,
+				mem : mem,
+				disk : disk
+			}]
+		};
+		okFn(serviceInfo);
+	}
+}
+function submit4Edit(okFn, btndisableFn){
+	var flag = vertifyRequired();
+	if(flag){
+		if(IX.isFn(btndisableFn)) btndisableFn();
+		var occupyCpu = $X('dlgOccupyCpu').value;
+		var virtualCpu = $X('dlgVirtualCpu').value;
+		var mem = $X('dlgMem').value;
+		var disk = $X('dlgDisk').value;
+		var serviceInfo = {
+			occupyCpu : occupyCpu,
+			virtualCpu : virtualCpu,
+			mem : mem,
+			disk : disk
+		};
+		okFn(serviceInfo);
+	}
+}
+function dialogBodyRefresh(bodyEl){
+	var content;
+	bodyEl.className = "ixw-body "+"vncDialog";
+	bodyEl.innerHTML = t_vncDialog.renderData("",{url : distanceUrl});
+	$XH.addClass($XH.first(bodyEl, "btns"), "hide");
+}
+function submitRecovery(okFn, btndisableFn){
+	if(IX.isFn(btndisableFn)) btndisableFn();
+	var recoveryObj = $X('dlgRecovery').value;
+	okFn({recoveryId : recoveryObj});
+}
+function submitBackup(okFn, btndisableFn){
+	var flag = vertifyRequired();
+	if(flag){
+		if(IX.isFn(btndisableFn)) btndisableFn();
+		var bkTime = $X('dlgBkTime').value;
+		var bkCycle = $X('dlgBkCycle').value;
+		var bkComment = $X('dlgComment').value;
+		okFn({
+			bkTime : bkTime,
+			bkCycle : bkCycle,
+			bkComment : bkComment
+		});
+	}
+}
+</script>
+<script>
+
+function getTimeHTML(){
+	var dpt = new IXW.Lib.DatePickTrigger({
+		value : new Date().getTime()/1000,
+		extraClz : "bkTime",
+		id : "dlgBkTime",
+		gtDateEnable : 1
+	});
+	return dpt.getHTML();
+}
+IX.ns("SDV.serviceDialog");
+SDV.serviceDialog.addService = function(okFn){
+	caller("getInfo4AddServie", {"serviceAttr" : ""}, function(info){
+		getSepratedData(info);
+		saveHostRscInfo(info.host);
+		ips = info.ip;
+		var ipBox = SDV.addIpBox.ipBox({
+			ips : ips,
+			sureFn : ipSure
+		});
+		showDialog({
+			title : "新建服务",
+			clz : "addServiceDlg",
+			content : t_addService.renderData("", {
+				partHTML : t_addServicePart.renderData("", {
+					productHTML : dropdownBox.getHTML(serviceCfg.product, info.product, "serviceDialog.chose"),
+					versionHTML : dropdownBox.getHTML(serviceCfg.version, []),
+					serviceHTML : dropdownBox.getHTML(serviceCfg.service, []),
+					hideClz : "hide"
+				}),
+				opacityClz : "opacity",
+				addedIPsHTML : "",
+				configDetailHTML :getConfigDetailHTML(),
+				hideClz : "hide",
+				additionHTML : ipBox.getHTML()
+			}),
+			okFn : function(cbFn, btndisableFn){submitService(okFn, btndisableFn);},
+			bindOn : function(areaEl){
+				bindOnValue(areaEl, "add");
+			}
+		});
+		jQuery(".container-body .ipsAndHosts").on("click", "button.dropdown-toggle", function(event){
+			var el = event.target;
+			var dropdown = jQuery(el).parents(".dropdown");
+			var bottom;
+			var areaEl = jQuery(".ixw-body .area");
+			if(areaEl.css("overflow") === "auto"){
+				dropdown.children(".dropdown-menu ").removeClass("dropdownUp");
+				setTimeout(function(){
+					areaEl.scrollTop(dropdown.parent().position().top + 10);
+				},50);
+			}else{
+				bottom = jQuery(window).height() - (dropdown.height() + dropdown.offset().top);
+				if(bottom < 300) dropdown.children(".dropdown-menu ").addClass("dropdownUp");
+				else dropdown.children(".dropdown-menu ").removeClass("dropdownUp");
+			}
+		});
+	});
+};
+SDV.serviceDialog.editServcie = function(rowModel,okFn){
+	var info = {
+		os : rowModel.get("os"),
+		occupyCpu : $XP(rowModel.get("cpu"),"total"),
+		virtualCpu : $XP(rowModel.get("cpu"),"total"),
+		mem : $XP(rowModel.get("mem"),"total"),
+		disk : $XP(rowModel.get("disk"),"total")
+	};
+	showDialog({
+		title : "编辑服务",
+		content : t_editService.renderData("", {
+			configDetailHTML : getConfigDetailHTML("edit", info)
+		}),
+		okFn : function(cbFn, btndisableFn){submit4Edit(okFn, btndisableFn);},
+		bindOn : function(areaEl){
+			bindOnValue(areaEl, "edit");
+		}
+	});
+};
+SDV.serviceDialog.recoveryBackup = function(rowModel,okFn){
+	var bkIP = rowModel.get("bkIP");
+	var localId ;
+	var bkWay = rowModel.get("backupWay");
+	caller("getRecoveryObj", {id : rowModel.getId()}, function(data){
+		var obj = IX.map(data, function(item){
+			var ip = $XP(item, "ip");
+			if(bkIP === ip) localId = $XP(item, "id");
+			return {
+				id : $XP(item, "id"),
+				name : bkIP === ip ? "本机" :  $XP(item, "name")+ " " + $XP(item, "ip")
+			};
+		});
+		showDialog({
+			title : "恢复备份",
+			content : t_recovery.renderData("", {
+				hideClz : bkWay ? "hide" : "",
+				recoveryObjHTML : dropdownBox.getHTML(IX.inherit(serviceCfg.recovery, {key :localId}), obj)
+			}),
+			okFn : function(cbFn, btndisableFn){submitRecovery(okFn, btndisableFn);}
+		});
+	});
+};
+SDV.serviceDialog.showVNC = function(rowId){
+	caller("getConsole", {id : rowId}, function(url){
+		distanceUrl = url;
+		showDialog({
+			autofit : false,
+			dialogBodyRefresh : dialogBodyRefresh
+		});
+		$X('vncframe').focus();
+		$X('openInNewWindow').setAttribute("href",url);
+	});
+};
+SDV.serviceDialog.backup = function(rowModel, okFn){
+	var status = rowModel.get("status");
+	showDialog({
+		title : "备份服务",
+		content : t_backup.renderData("", {
+			value : status,
+			bkTimeHTML : getTimeHTML(),
+			bkCycleHTML : inputBox.getHTML(serviceCfg.bkCycle)
+		}),
+		okFn : function(cbFn, btndisableFn){submitBackup(okFn, btndisableFn);},
+		bindOn : function(areaEl){
+				bindOnValue(areaEl);
+			}
+	});
+};
+SDV.serviceDialog.addService4OV = function(infoParams,okFn){//在overview页面添加服务
+	caller("getInfo4OV", infoParams, function(info){
+		saveHostRscInfo(info.host);
+		ips = info.ip;
+		var ipBox = SDV.addIpBox.ipBox({
+			ips : ips,
+			sureFn : ipSure
+		});
+		showDialog({
+			title : "添加服务",
+			clz : "addServiceDlg",
+			content : t_addService.renderData("", {
+				partHTML : t_addService4OVPart.renderData("", {
+					pValue : $XP(infoParams, "product"),
+					vValue : $XP(infoParams, "version"),
+					sValue : $XP(infoParams, "service")
+				}),
+				opacityClz : "",
+				addedIPsHTML : "",
+				configDetailHTML : getConfigDetailHTML("add", info),
+				hideClz : "",
+				additionHTML : ipBox.getHTML()
+			}),
+			okFn : function(cbFn, btndisableFn){submitService(okFn, btndisableFn);},
+			bindOn : function(areaEl){
+				bindOnValue(areaEl, "add");
+			}
+		});
+		var defaultAEl = jQuery(".rscConfig .default a")[0];
+		$XD.setDataAttr(defaultAEl, "occupyCpu", $XP(info, "occupyCpu"));
+		$XD.setDataAttr(defaultAEl, "virtualCpu", $XP(info, "virtualCpu"));
+		$XD.setDataAttr(defaultAEl, "mem", $XP(info, "mem"));
+		$XD.setDataAttr(defaultAEl, "disk", $XP(info, "disk"));
+	});
+};
+</script>

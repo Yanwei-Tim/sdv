@@ -1,0 +1,115 @@
+<tpl id="treeNodes">
+	<ul class="{foldClz}"><tpl id="items">
+		<li class="{lastClz} {firstClz} {rootClz}">
+			<span class="line before"></span><a class="{clz} fold" data-href="$tree.click" data-key="{key}" data-id="{id}" >
+				<span class="pic-expand {hideClz} {foldClz}"></span>
+				<span>{name}</span>
+			</a>{popHTML}{HTML}
+		</li>
+	</tpl><li class="add last {actionClz}"><span class="line before"></span><a data-href="$tree.add"></a></li></ul>
+</tpl>
+<tpl id="pop">
+	<div class="mask">
+		<a class="icon-edit" data-href="$algo.edit" data-id="{id}" data-name="{name}" data-level="{level}"><span class="act-edit"></span>编辑</a>
+		<a class="icon-delete" data-href="$algo.delete" data-id="{id}" data-name="{name}" data-level="{level}"><span class="act-delete"></span>删除</a>
+	</div>
+</tpl>
+<tpl id="rootPop">
+	<div class="rootMask">
+		<a class="icon-delete" data-href="$algo.delete" data-id="{id}" data-name="{name}" data-level="{level}"><span class="act-delete"></span>删除</a>
+	</div>
+</tpl>
+<script>
+var treeActionsConfig = IXW.Actions.configActions;
+var treeHT = {};
+treeActionsConfig([
+	["tree.click", function(params, el){
+		if($XH.hasClass(el, "disable")) return;
+		var key = params.key;
+		var ulEl = $XD.first($XD.ancestor(el, "li"), "ul");
+		var spanEl = $XH.first(el, "pic-expand");
+		if(key === "view"){
+			var id = $XD.dataAttr(el, "id");
+			treeHT.view(id);
+		}else if(key === "expand"){
+			$XH.removeClass(ulEl,"fold");
+			$XH.removeClass(spanEl,"fold");
+			$XD.setDataAttr(el, "key", "fold");
+			SDV.Env.onResize4Body();
+
+		}else if(key === "fold"){
+			$XH.addClass(ulEl, "fold");
+			$XH.addClass(spanEl, "fold");
+			$XD.setDataAttr(el, "key", "expand");
+			SDV.Env.onResize4Body();
+		}
+	}], ["tree.add", function(params, el){
+		var liRoot = $XH.ancestor(el, "root");
+		var aEl = $XD.first(liRoot, "a");
+		var id = $XD.dataAttr(aEl, "id");
+		treeHT.add(id);
+	}], ["algo.edit", function(params, el){
+		var id = $XD.dataAttr(el, "id");
+		var name = $XD.dataAttr(el, "name");
+		treeHT.edit({id : id, name : name});
+	}],["algo.delete", function(params, el){
+		var id = $XD.dataAttr(el, "id");
+		var name = $XD.dataAttr(el, "name");
+		var level = $XD.dataAttr(el, "level");
+		treeHT.deleteNode({id : id, name : name, level : level});
+	}]
+]);
+function getPopHtml(userType, level, id, name){
+	if(!userType){
+		return "";
+	}else{
+		switch(level){
+			case 1:
+				return t_pop.renderData("", {id : id, name : name, level : level});
+			case 0:
+				return t_rootPop.renderData("", {id : id, name : name, level : level});
+			default :
+				return "";
+		}
+	}
+}
+IX.ns("SDV.Lib");
+SDV.Lib.Tree = function(cfg){
+	var userType = parseInt($XP(cfg, "userType"));
+	treeHT.add = $XF(cfg, "add");
+	treeHT.edit = $XF(cfg, "edit");
+	treeHT.deleteNode = $XF(cfg, "delete");
+	treeHT.view = $XF(cfg, "view");
+	function getNodesHTML(nodes, len){
+		var level = $XP(nodes[0], "level");
+		return t_treeNodes.renderData("", {
+			items : IX.map(nodes, function(node, index){
+				var isHasNodes = $XP(node, "nodes");
+				var name = $XP(node, "name");
+				var id = $XP(node, "id");
+				var HTML = isHasNodes ? getNodesHTML(node.nodes, node.nodes.length) : "";
+				var popHTML = getPopHtml(userType, level, id, name);
+				return {
+					name : name,
+					rootClz : $XP(node, "level") ===0 ? "root" : level ===1 ?"level1" : "",
+					lastClz : (nodes.length === 1 || nodes.length-1 === index) && (level !==1 || (!userType && level===1))  ? "last" : "",
+					firstClz : index ===0 ? "first" : "",
+					clz : ((level === 0 ||level === 1) && userType) || (!isHasNodes && level !==0) || (isHasNodes && node.nodes.length >50)  ? "" : "disable",
+					hideClz : isHasNodes && node.nodes.length >50 ? "" : "hide",
+					foldClz : isHasNodes && node.nodes.length >50 ? "fold" : "expand",
+					key : !isHasNodes ? "view" : isHasNodes && node.nodes.length >50 ? "expand" : "",
+					id : id,
+					popHTML : popHTML,
+					HTML : HTML
+				};
+			}),
+			actionClz : level === 1 && userType?"":"hide",
+			foldClz : len >10 ? "fold" : "expand"
+		});
+	}
+	return {
+		getHTML : function(){return getNodesHTML(cfg.nodes);},
+		refresh : function(cfg){return getNodesHTML(cfg.nodes);}
+	};
+};
+</script>

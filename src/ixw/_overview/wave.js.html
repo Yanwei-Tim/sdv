@@ -1,0 +1,121 @@
+<script>
+IX.ns("SDV.Wave");
+SDV.Wave.SDVWave = function(cfg){
+	var vertexes = [], auto = 3, canvas, ctx, j = 0, timer = null;
+	var resetVertexes = [];
+	var timeInterval = 10;
+	var name = $XP(cfg, "name", "");
+	var item = $XP(cfg, "item", "");
+	var indicsNum = parseFloat(item.indicsNum);
+	var baseHeight, perHeight, realHeight;
+	var sinCycle ;
+	var xOffset = 1;//代表波纹每次移动1个像素
+	function draw(tmpVer, offsetHeight){//canvas原点在左上角，向下是正y,向右是正X
+		ctx.beginPath();
+		ctx.fillStyle = "#00ffc0";
+		//ctx.moveTo(tmpVer[0].x, tmpVer[0].y);
+		if(offsetHeight === canvas.height){
+			ctx.fillStyle = "rgba(255,255,255,0)";
+		}
+		if(offsetHeight === 0){
+			ctx.moveTo(0, 0);
+			ctx.lineTo(canvas.width, 0);
+		}else{
+			ctx.moveTo(tmpVer[0].x, tmpVer[0].y);
+			for(var i=1; i<tmpVer.length; i++){
+				ctx.lineTo(tmpVer[i].x, tmpVer[i].y);
+			}
+		}
+		ctx.lineTo(canvas.width, canvas.height);
+		ctx.lineTo(0, canvas.height);
+		//ctx.stroke();
+		ctx.fill();
+	}
+	function Vertex(x,y){
+		this.x = x;
+		this.y = y;
+	}
+	function resetVertex(isgt, yOffset){
+		var yInterval = vertexes.length -xOffset;
+		var i;
+		for(i = 0; i< yInterval;i++){
+			resetVertexes[i].y = vertexes[i + xOffset].y - yOffset;
+		}
+		for(i = yInterval; i < yInterval + xOffset; i ++){
+			resetVertexes[i].y = vertexes[i-yInterval].y - yOffset;
+		}
+		//vertexes = resetVertexes;这样两个值会变成一个对象。
+		for(i =0; i< vertexes.length;i++){
+			vertexes[i].y = resetVertexes[i].y;
+		}
+	}
+	function update(orginOffsetH, yOffset){
+		baseHeight = orginOffsetH;
+		ctx.clearRect(0, 0, canvas.width,canvas.height);
+		var isgt;
+		if(perHeight > 0){
+			isgt = realHeight - yOffset > baseHeight;
+			if(isgt){
+				realHeight-=yOffset;
+			}else if(realHeight > baseHeight){
+				realHeight = baseHeight;
+				yOffset = realHeight - baseHeight;
+			}else{
+				yOffset = 0;
+			}
+		}else{
+			isgt = realHeight - yOffset < baseHeight;
+			if(isgt){
+	
+				realHeight -=yOffset;
+			}else if(realHeight < baseHeight){
+				realHeight = baseHeight;
+				yOffset = realHeight - baseHeight;
+			}else{
+				yOffset = 0;
+			}
+		}
+		resetVertex(isgt, yOffset);
+		draw(resetVertexes, realHeight);
+
+	}
+	function initWave(){
+		canvas = $X('cav-' + name);
+		var width = canvas.width, height = canvas.height;
+		ctx = canvas.getContext("2d");
+		baseHeight  = height * (1-indicsNum);//实际
+		realHeight = height;
+		perHeight = height/216;//每次上涨或下降perHeight 0.5像素，保证最长2s左右能动完
+		var i;
+		sinCycle = 2 * Math.PI/width;//周期为canvas的宽度
+		//初始化vertexs
+		for(i =0; i<canvas.width+1; i++){
+			vertexes[i] = new Vertex(i, auto*Math.sin(sinCycle *i - Math.PI/2) +height);
+			resetVertexes[i] = new Vertex(i, 0);
+		}
+		draw(vertexes);
+		timer = setInterval(function(){update(baseHeight, perHeight);}, timeInterval);
+	}
+	function refresh(item){
+		var baseHeightNew = canvas.height *(1-item.indicsNum);
+		//realHeight = baseHeight;
+		if(item.indicsNum === indicsNum) return;
+		indicsNum = item.indicsNum;
+		if( (baseHeightNew > baseHeight && perHeight >0) || (baseHeightNew < baseHeight && perHeight <0)) perHeight = -perHeight;
+		clearInterval(timer);
+		timer = null;
+		timer = setInterval(function(){update(baseHeightNew, perHeight);}, timeInterval);
+	}
+	return {
+		initWave : initWave,
+		refresh : function(item){
+			refresh(item);
+		},
+		getTimer : function(){
+			return timer;
+		}
+	};
+
+};
+
+</script>

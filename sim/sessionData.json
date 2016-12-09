@@ -1,0 +1,10 @@
+{
+	"retCode" : 1,
+	"data" :{
+		"id" : 0,
+		"name" : "管理员",
+		"type" :1,
+		"version" : "v1.23.4",
+		"modules" : ["moduleA", "moduleB"]
+	}
+}

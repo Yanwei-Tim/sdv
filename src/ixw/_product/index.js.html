@@ -1,0 +1,223 @@
+<script>
+var caller = SDV.Global.productCaller;
+var ixwPages = IXW.Pages;
+var globalActionConfig = IXW.Actions.configActions;
+var productDialog = SDV.productDialog;
+var sdvDialog = SDV.Dialog;
+var hideDialog = SDV.Dialog.hide;
+var updateGridInterval = null;
+
+var GridCfgs = {
+	product : {
+		clz : "productGrid",
+		columns : ["_checkbox", "_no","productName","version","serviceAttr"],
+		itemPageName : "products",
+		tools : {
+			type : "product",
+			buttons : ["add", "delete"],
+			search : true,
+			filter : ["serviceAttr"]
+		}
+	},
+	service : {
+		clz : "productServiceGrid",
+		columns : ["_checkbox", "_no", "serviceName", "occupyCpu", "virtualCpu", "occupyMem", "occupyDisk"],
+		itemPageName : "productServices",
+		tools : {
+			type : "service",
+			buttons : ["add", "delete"]
+		}
+	}
+};
+var InfoTexts = {
+	product : {
+		name : "产品",
+		listCaller : "listProducts",
+		editCaller : "editProduct",
+		deleteCaller : "deleteProducts",
+		addCaller : "addProduct",
+		addDlg : "addProduct",
+		editDlg : "editProduct"
+	},
+	service : {
+		name : "服务",
+		listCaller : "listServices4Product",
+		editCaller : "editService4Product",
+		deleteCaller : "deleteServices4Product",
+		addDlg : "addService4Product",
+		editDlg : "editService4Product"
+	}
+};
+var editTexts = {
+	product : "editProduct",
+	service : "editService4Product"
+};
+function getEnabledBtns(selectedRows){
+	var isBase, arrbtnStatus=[];
+	var del;
+	IX.map(selectedRows, function(rowModel){
+		isBase = rowModel.get("isBase");
+		if(!del && !isBase) del = true;
+	});
+	if(del) arrbtnStatus.push("delete");
+	return arrbtnStatus;
+}
+function deleteFn(type, info, grid){
+	var optInfo = InfoTexts[type];
+	sdvDialog.confirm("删除"+optInfo.name, "确认删除选中的"+optInfo.name+"吗？", function(){
+		caller(optInfo.deleteCaller, {ids : info.ids}, function(){
+			hideDialog();
+			grid.refresh();
+		}, hideDialog);
+	});
+}
+function editFn(rowModel, type, grid, isBase){
+	var textInfo = InfoTexts[type];
+	productDialog[textInfo.editDlg](rowModel, function(data){
+		caller(textInfo.editCaller, IX.inherit({id : rowModel.getId()}, data), function(){
+			hideDialog();
+			grid.refreshGrid();
+		},function(){
+			hideDialog();
+		});
+	}, isBase);
+}
+function distanceFn(){}
+</script>
+<tpl id="page">
+	<div id="pathNav"></div>
+	<div id="gridTools" class="grid-tools"></div>
+	<div id="gridContainer"></div>
+	<img id="refreshLoading" class="loading" src = "{imgUrl}">
+</tpl>
+<script>
+function showGrid(type,cbFn, rowId,isBase){
+	var userType = SDV.Env.getUserType();
+	var options = type === "service" ? {id : rowId} : {serviceAttrId : -1};
+	var gridCfg = GridCfgs[type], textInfo = InfoTexts[type];
+	var noBtns = type === "product" ? ["test"] : "";
+	gridCfg.clz = userType ? gridCfg.clz  : gridCfg.clz  +" noactionGrid";
+	gridCfg.tools.buttons = userType ? gridCfg.tools.buttons : noBtns;
+	var grid = new SDV.Grid.NVGrid(IX.inherit(gridCfg, {
+		container : "gridContainer",
+		actions :userType ? [["edit", "编辑", function(rowModel){
+			editFn(rowModel, type, grid, isBase);
+		}], isBase ? ["delete", "删除", function(rowModel){
+			deleteFn(type, {ids : [rowModel.getId()], names : rowModel.get("name")}, grid);
+		}, "disable"]: ["delete", "删除", function(rowModel){
+			deleteFn(type, {ids : [rowModel.getId()], names : rowModel.get("name")}, grid);
+		}] ].concat(type === "product" ? [["distance", "远程登录", function(rowModel){
+			distanceFn();
+		},"disable"]] : []):type === "product"? [["distance", "远程登录", function(rowModel){
+			distanceFn();
+		}]]:[],
+		dataLoader : function(params, cbFn){
+			caller(textInfo.listCaller, IX.inherit(params,options), cbFn, function(){
+				switchOut();
+			});
+		},
+		clickOnRow : function(rowId, cellName, cellEl){
+			if(type === "service") return;
+			ixwPages.load(ixwPages.createPath("product-service", {id : rowId}));
+		},
+		onselect : function(){
+			//SDV.GridTools.enableTools("gridTools",grid.getSelectedRows().length >0);
+			var enableBtns =[];
+			if(isBase) enableBtns = [];
+			else enableBtns= getEnabledBtns(grid.getSelectedRows());
+			SDV.GridTools.enableTools("gridTools",false, enableBtns);
+		},
+		ifactionsEnable : function(rowData){
+			return {
+				"distance" : rowData.allowLogin ? true : false
+			};
+		}
+	}));
+	SDV.Grid.currentGrid = {
+		add : function(){
+			var optInfo = InfoTexts[type];
+			productDialog[optInfo.addDlg](function(data){
+				if(type === "service"){ //服务
+					hideDialog();
+					grid.refreshGrid();
+				}else{ //产品
+					caller(optInfo.addCaller, data, function(){
+						hideDialog();
+						grid.refreshGrid();
+					},function(){
+						hideDialog();
+					});
+				}
+			}, rowId);
+		},
+		"delete" : function(){
+			var ids = [];
+			var names = "";
+			IX.map(grid.getSelectedRows(), function(rowModel){
+				if(!rowModel.get("isBase")){
+					ids.push(rowModel.getId());
+					names = names +rowModel.get("name") + "、" ;
+				}
+			});
+			if(names) names = names.substring(0, names.length-1);
+			deleteFn(type, {ids : ids, names : names}, grid);
+		},
+		search : function(value){
+			grid.search(value);
+		},
+		filter : function(_options){
+//			var type = $XP(_options, "type", "status");
+//			var value = $XP(_options, "key", "");
+			options.serviceAttrId = $XP(_options, "key", "-1");
+			grid.refreshGrid(0);
+		}
+	};
+	if(type === "product"){
+		caller("getAttributes4Filter", {}, function(filterData){
+			SDV.GridTools.showTools("gridTools", gridCfg.tools, {"filterData":filterData}, "");
+		});
+	}
+	SDV.GridTools.showTools("gridTools", gridCfg.tools,{});
+	SDV.Env.onResize4Body();
+	var refreshFn = IX.emptyFn();
+	if(type === "service" && SDV.Global.autoRefresh)
+		refreshFn = function(){
+			updateGridInterval = setInterval(grid.refresh, 5000);
+		};
+	grid.show(refreshFn);
+	cbFn();
+}
+function showProducts(type,cbFn, rowId){
+	$X('body').innerHTML = t_page.renderData("",{imgUrl : SDV.Global.refreshIntervalUrl});
+	if(type === "service"){
+		caller("getProductName", {id : rowId}, function(data){
+			SDV.PathNav.showPathNav("pathNav", ["products"], $XP(data, "name"));
+			var isBase = $XP(data, "isBase");
+			showGrid(type,cbFn, rowId,isBase);
+		});
+	}else{
+		showGrid(type,cbFn);
+	}
+}
+</script>
+<script>
+function switchOut(){
+	if(!updateGridInterval) return;
+	clearInterval(updateGridInterval);
+	updateGridInterval=null;
+}
+IX.ns("SDV.Product");
+SDV.Product.init = function(pageCfg, pageParams, cbFn){
+	pageCfg.switchOut = switchOut;
+	var pageName = pageCfg.name;
+	var productId = $XP(pageParams, "id");
+	switch(pageName){
+	case "products":
+		showProducts("product",cbFn);
+		break;
+	case "product-service":
+		showProducts("service", cbFn, productId);
+		break;
+	}
+};
+</script>

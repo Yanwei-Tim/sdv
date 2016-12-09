@@ -1,0 +1,305 @@
+<script>
+var caller = SDV.Global.operationCaller;
+var ixwPages = IXW.Pages;
+var globalActionConfig = IXW.Actions.configActions;
+var productDialog = SDV.productDialog;
+var sdvDialog = SDV.Dialog;
+var hideDialog = SDV.Dialog.hide;
+var updateGridInterval = null;
+
+var GridCfgs = {
+	operation : {
+		clz : "operationGrid",
+		columns : ["_checkbox", "_no","servIp","allocatedCpu", "allocatedMem", "allocatedDisk", "serverStatus"],
+		itemPageName : "operationList",
+		tools : {
+			type : "operation",
+			buttons : ["refresh","startup", "shutdown", "delete"],
+			search : true,
+			filter :["status"]
+		}
+	},
+	service : {
+		clz : "operationServiceGrid",
+		columns : ["_checkbox","_no","serviceName","product","version","ip","cpuUsage","memUsage","diskUsage","serviceStatus"],
+		itemPageName : "operationServices",
+		tools : {
+			type : "service"
+		}
+	}
+};
+var InfoTexts = {
+	operation : {
+		name : "服务器",
+		listCaller : "listServers",
+		deleteCaller : "deleteServers"
+	},
+	service : {
+		name : "服务",
+		listCaller : "listServices4Server"
+	}
+};
+
+function ifInArrayStatus(status,  arr){
+	var isEnabled = false;
+	IX.map(arr, function(item){
+		if(status === item){
+			isEnabled = true;
+		}
+	});
+	return isEnabled;
+}
+function getEnabledBtns(selectedRows){
+	var status = "", arrbtnStatus=[];
+	var startup, shutdown, deleteServ;
+	IX.map(selectedRows, function(rowModel){
+		status = rowModel.get("status");
+		if(!startup) startup = ifInArrayStatus(status, [1]);
+		if(!shutdown) shutdown = ifInArrayStatus(status, [0]);
+		if(!deleteServ) deleteServ = ifInArrayStatus(status, [4]);
+	});
+	if(startup) arrbtnStatus.push("startup");
+	if(shutdown) arrbtnStatus.push("shutdown");
+	if(deleteServ) arrbtnStatus.push("delete");
+	return arrbtnStatus;
+}
+function getEnableActs(rowData){
+	var startup, shutdown, deleteServ;
+	var status = rowData.status;
+	startup = ifInArrayStatus(status, [1]);
+	shutdown = ifInArrayStatus(status, [0]);
+	deleteServ = ifInArrayStatus(status, [4]);
+	return {
+		"startup" : startup,
+		"shutdown" : shutdown,
+		"delete" : deleteServ
+	};
+}
+function startupFn(ids, grid){
+	caller("startupServers", {ids : ids}, function(){
+		grid.refresh();
+	});
+}
+function shutdownFn(ids, grid){
+	caller("shutdownServers", {ids : ids}, function(){
+		grid.refresh();
+	});
+}
+function deleteFn(type, info, grid){
+	var optInfo = InfoTexts[type];
+	sdvDialog.confirm("删除"+optInfo.name, "确认删除选中的"+optInfo.name+"吗？", function(){
+		caller(optInfo.deleteCaller, {ids : info.ids}, function(){
+			hideDialog();
+			grid.refresh();
+		}, hideDialog);
+	});
+}
+</script>
+<tpl id="page">
+	<div id="pathNav"></div>
+	<div id="gridTools" class="grid-tools"></div>
+	<div id="gridContainer"></div>
+	<img id="refreshLoading" class="loading" src = "{imgUrl}">
+</tpl>
+<tpl id="subpage">
+	<div id="pathNav"></div>
+	<div class="optService">
+		<div class="card-switch">
+			<a class="" data-href="{infoHref}">服务器详情</a>
+			<a class="active" data-href="{serviceHref}">服务情况</a>
+		</div>
+	</div>
+	<div id="gridContainer"></div>
+	<img id="refreshLoading" class="loading" src = "{imgUrl}">
+</tpl>
+
+<script>
+function showOperations(type,cbFn, rowId){
+	var userType = SDV.Env.getUserType();
+	if(type === "operation")
+		$X('body').innerHTML = t_page.renderData("",{imgUrl : SDV.Global.refreshIntervalUrl});
+	else{
+		$X('body').innerHTML = t_subpage.renderData("",{
+			infoHref : ixwPages.createPath("operation-info", {id : rowId}),
+			serviceHref : ixwPages.createPath("operation-service", {id : rowId}),
+			imgUrl : SDV.Global.refreshIntervalUrl
+		});
+		caller("getServerIp", {id : rowId}, function(ip){
+			SDV.PathNav.showPathNav("pathNav", ["operations"], ip);
+		});
+	}
+
+	var gridCfg = GridCfgs[type], textInfo = InfoTexts[type];
+	gridCfg.clz = userType ? gridCfg.clz  : gridCfg.clz  +" noactionGrid";
+	gridCfg.tools.buttons = userType ? gridCfg.tools.buttons : ["test"];
+	var options = type === "operation" ? {status : "-1"} : {id : rowId};
+	var grid = new SDV.Grid.NVGrid(IX.inherit(gridCfg, {
+		container : "gridContainer",
+		actions :userType && type==="operation" ? [["startup", "启动", function(rowModel){
+			startupFn([rowModel.getId()], grid);
+		}, "disable"],["shutdown", "关机", function(rowModel){
+			shutdownFn([rowModel.getId()], grid);
+		}, "disable"], ["delete", "删除", function(rowModel){
+			deleteFn(type, {ids : [rowModel.getId()], names : rowModel.get("name")}, grid);
+		}, "disable"]]:[],
+		dataLoader : function(params, cbFn){
+			caller(textInfo.listCaller, IX.inherit(params, options), cbFn, function(){
+				switchOut();
+			});
+		},
+		clickOnRow : function(rowId, cellName, cellEl){
+			if(type === "service") return;
+			ixwPages.load(ixwPages.createPath("operation-info", {id : rowId}));
+		},
+		onselect : function(){
+			//SDV.GridTools.enableTools("gridTools",grid.getSelectedRows().length >0);
+			var enableBtns = getEnabledBtns(grid.getSelectedRows());
+			SDV.GridTools.enableTools("gridTools",false, enableBtns);
+		},
+		ifactionsEnable : function(rowData){
+			return getEnableActs(rowData);
+		}
+	}));
+	SDV.Grid.currentGrid = {
+		refresh : function(){
+			grid.refreshGrid();
+		},
+		startup : function(){
+			var ids = [];
+			IX.map(grid.getSelectedRows(), function(rowModel){
+				var status = rowModel.get("status");
+				if(status === 1){
+					ids.push(rowModel.getId());
+				}
+			});
+			startupFn(ids, grid);
+		},
+		shutdown : function(){
+			var ids = [];
+			IX.map(grid.getSelectedRows(), function(rowModel){
+				var status = rowModel.get("status");
+				if(status === 0){
+					ids.push(rowModel.getId());
+				}
+			});
+			shutdownFn(ids, grid);
+		},
+		"delete" : function(){
+			var ids = [];
+			var names = "";
+			IX.map(grid.getSelectedRows(), function(rowModel){
+				var status = rowModel.get("status");
+				if(status === 4){
+					ids.push(rowModel.getId());
+					names = names +rowModel.get("name") + "、" ;
+				}
+			});
+			if(names) names = names.substring(0, names.length-1);
+			deleteFn(type, {ids : ids, names : names}, grid);
+		},
+		filter : function(_options){
+			var type = $XP(_options, "type", "status");
+			var value = $XP(_options, "key", "");
+			options[type] = value;
+			//options = _options;
+			grid.refreshGrid(0);
+		},
+		search : function(value){
+			grid.search(value);
+		}
+
+	};
+	if(type === "operation")
+		SDV.GridTools.showTools("gridTools", gridCfg.tools);
+	SDV.Env.onResize4Body();
+	grid.show(function(){
+		if(SDV.Global.autoRefresh) updateGridInterval = setInterval(grid.refresh, 5000);
+	});
+	cbFn();
+}
+</script>
+<tpl id="serverInfo">
+	<div id="pathNav"></div>
+	<div class="card-switch">
+		<a class="active" data-href="{infoHref}">服务器详情</a>
+		<a class="" data-href="{serviceHref}">服务情况</a>
+	</div>
+	<div class="serviceInfo">
+		<div class="infoContainer">
+			<div class="title">{name}</div>
+			<div class="hdr"><span class="no">序号</span><span class="text">名称</span><span class="value">详细信息</span></div>
+			<div class="itemContainer"><div class="item">
+				<div><span class="no">1</span><span class="text">CPU类型</span><span class="value">{cpuType}</span></div>
+				<div><span class="no">2</span><span class="text">CPU主频</span><span class="value">{cpuClocked}</span></div>
+				<div><span class="no">3</span><span class="text">CPU处理器</span><span class="value">{cpuProcessor}</span></div>
+				<div><span class="no">4</span><span class="text">内存</span><span class="value">{mem}</span></div>
+				<div><span class="no">5</span><span class="text">操作系统</span><span class="value">{os}</span></div>
+				<div><span class="no">6</span><span class="text">带宽</span><span class="value">{bandwidth}</span></div>
+				<div><span class="no">7</span><span class="text">添加时间</span><span class="value">{addTime}</span></div>
+			</div></div>
+		</div>
+	</div>
+</tpl>
+<script>
+function formatMem(mem){
+	if(mem > 1024)
+		return Math.round(mem/1024*100)/100 + "GB";
+	else return mem + "MB";
+}
+function formatBand(band){
+	if(band > 1024){
+		return Math.round(band/1024*100)/100 + "Gbps";
+	}else
+		return band + "Mbps";
+}
+function _showOperationInfo(serverId, type, cbFn){
+	$X('body').innerHTML = new IX.ITemplate({tpl : ['<img id="refreshLoading" class="loading" src="{imgUrl}">']}).renderData("",{
+		imgUrl : SDV.Global.refreshIntervalUrl
+	});
+	caller("getServerInfo", {id : serverId}, function(serverInfo){
+		var cpuProcessor = $XP(serverInfo, "cpuProcessor", {});
+		$X('body').innerHTML = t_serverInfo.renderData("", {
+			infoHref : ixwPages.createPath("operation-info", {id : serverId}),
+			serviceHref : ixwPages.createPath("operation-service", {id : serverId}),
+			name : $XP(serverInfo, "ip", ""),
+			cpuType : $XP(serverInfo, "cpuType", ""),
+			cpuClocked : $XP(serverInfo, "cpuClocked", ""),
+			cpuProcessor : $XP(cpuProcessor, "core", 0) + "核/" + $XP(cpuProcessor, "thread", 0) + "线程",
+			mem : $XP(serverInfo, "mem", 0) + "GB",
+			os : $XP(serverInfo, "os", ""),
+			bandwidth : formatBand($XP(serverInfo, "bandwidth", "")),
+			addTime : $XP(serverInfo, "addTime", "")
+		});
+		SDV.PathNav.showPathNav("pathNav", ["operations"], $XP(serverInfo, "ip", ""));
+	});
+
+
+}
+</script>
+<script>
+function switchOut(){
+	if(!updateGridInterval) return;
+	clearInterval(updateGridInterval);
+	updateGridInterval=null;
+}
+IX.ns("SDV.Operation");
+SDV.Operation.init = function(pageCfg, pageParams, cbFn){
+	pageCfg.switchOut = switchOut;
+	var pageName = pageCfg.name;
+	var serverId = $XP(pageParams, "id");
+	switch(pageName){
+	case "operations":
+		showOperations("operation", cbFn);
+		break;
+	case "operation-list":
+		showOperations("operation", cbFn);
+		break;
+	case "operation-info":
+		_showOperationInfo(serverId, "info", cbFn);
+		break;
+	case "operation-service":
+		showOperations("service", cbFn, serverId);
+		break;
+	}
+};
+</script>

@@ -1,0 +1,592 @@
+<script>
+var caller = SDV.Global.serviceCaller;
+var sdvDialog = SDV.Dialog;
+var showDialog = SDV.Dialog.show;
+var hideDialog = SDV.Dialog.hide;
+var globalActionConfig = IXW.Actions.configActions;
+var dropdownBox = SDV.inputBox.dropdownBox();
+var productHT = IX.IListManager(), versionHT = IX.IListManager(), serviceHT = IX.IListManager();
+var hosts = {}, ips = {};
+var proInfo = SDV.Const.ProductInfo;
+</script>
+<tpl id="serviceItemContainer">
+	<tpl id="serviceItem">
+		<li>
+			<div class="contentRow">
+				<span class="label" title="{serviceName}">{serviceName}</span>
+				<a class="addBtn" data-href="$overviewDialog.addIP" data-key="{serviceName}">添加</a><span class='mark'>*</span>
+			</div>
+			<div class="ipsAndHosts" data-name="{serviceName}"></div>
+		</li>
+	</tpl>
+</tpl>
+<tpl id="addProduct">
+	<div class="container-body active">
+		<div class="ov-product contentRow">
+			<span class="label">产品</span>{productHTML}<span class='mark'>*</span>
+		</div>
+		<div class="ov-version contentRow opacity">
+			<span class="label">版本</span>{versionHTML}<span class='mark'>*</span>
+			<div class="rowMask"></div>
+		</div>
+		<div class="contentRow text-center hide">
+			<span class="pro-warning mark"></span>
+		</div>
+		<ul class="services"></ul>
+	</div>
+	<div class="container-addition">{additionHTML}</div>
+</tpl>
+<tpl id="availRsrcsContainer">
+	<tpl id="availRsrcs">
+		<li class="dropdown-item" title="{title}">
+			<a data-href="$overviewDialog.chose" data-key="{key}">{html}</a>
+		</li>
+	</tpl>
+</tpl>
+<tpl id="addedIPsContainer">
+	<tpl id="addedIPs">
+		<div class="ip contentRow">
+			<input id="ovIp-{idNum}" type="hidden" value="{value}">
+			<span class="label">IP（{num}）</span><span class="value">{value}</span>
+			<a class="pic-close" data-href="$overviewDialog.ip.delete" data-key="{value}"></a>
+		</div>
+		<div class="host contentRow">
+			<span class="label">所属主机</span>{hostHTML}<span class='mark'>*</span>
+			<div class="host-warning text-center"></div>
+		</div>
+	</tpl>
+</tpl>
+<tpl id="ipsContainer">
+	<tpl id="availIps">
+		<li id="menu-{value}">
+			<a class="checkbox {selected}" data-href="$ip.select" data-key="{value}"></a>
+			<span>{value}</span>
+		</li>
+	</tpl>
+</tpl>
+<tpl id="selectedIpsContainer">
+	<tpl id="selectedIps">
+		<li id="selected-{ip}">
+			<span>{ip}</span>
+			<a class='pic-close' data-href='$ip.cancle' data-key='{ip}'></a>
+		</li>
+	</tpl>
+</tpl>
+<tpl id="hostItemsContainer">
+	<tpl id="repeat">
+		<li class="dropdown-item" title="{host}剩余 CPU {cpu} 核，内存 {mem} GB，硬盘 {disk} GB">
+			<a data-href="$overviewDialog.choseHost" data-key="{host}">
+				<span class="item-body">{host}</span>
+				<span class="item-prompt">剩余 CPU {cpu} 核，内存 {mem} GB,硬盘(GB) {disk} GB</span>
+			</a>
+		</li>
+	</tpl>
+</tpl>
+<script>
+var overviewCfg = {
+	product : {id : "ovProduct", inputClz : "required", type : "product"},
+	version : {id : "ovVersion", inputClz : "required", type : "version"},
+	host : {id : "ovHost", inputClz : "required"}
+};
+globalActionConfig([["overviewDialog.chose", function(params, el){
+	var dropdownEl = $XH.ancestor(el, "dropdown");
+	if(!dropdownEl) return;
+	var value = el.innerHTML === "空" ? "" : el.innerHTML;
+	var key = params.key;
+	var type = $XD.dataAttr(dropdownEl, "type");
+	var valueEl = $(dropdownEl).find(".dropdown-toggle .value"); //显示值展示处
+	var inputEl = $(dropdownEl).find("[type='hidden'].required"); //实际值展示处
+	if(inputEl.value === value) return;
+	inputEl.val(key);
+	valueEl.html(value);
+	var pname, vname;
+	if($X('ovProduct')) pname = $X('ovProduct').value;
+	if($X('ovVersion')) vname = $X('ovVersion').value;
+	if(type === "product"){
+		$X('ovVersion').value = "";
+		$(".area .ov-version .dropdown-toggle .value").text("");
+		$(".area .ov-version").removeClass("opacity");
+		$(".area .ov-version .dropdown-menu").html(getAvailList(productHT.get(value)));
+		$(".area .services").empty();
+		$(".area .pro-warning").parent().addClass("hide");
+		resizeBodyEl();
+	}else if(type === "version"){
+		var serviceItem = IX.map(versionHT.get(pname + '-' +value), function(item){
+			var name = $XP(item, "name", "");
+			return {
+				serviceName : name
+			};
+		});
+		var specialPros = [proInfo[0].name, proInfo[1].name, proInfo[2].name, proInfo[3].name];
+		if(serviceItem.length > 0){
+			$(".area .services").html(t_serviceItemContainer.renderData("", {
+				serviceItem : serviceItem
+			}));
+			if(specialPros.indexOf(pname) > -1){
+				caller("checkNeedOther", {
+					product : pname,
+					version : vname,
+					service : ""
+				}, function(data){
+					if(data.isPrompt === 1){
+						$(".area .pro-warning").parent().removeClass("hide");
+						$(".area .pro-warning").text("系统中还未创建" + data.names.join("、") + ",会影响"+ pname +"部分功能的使用!");
+					}else{
+						$(".area .pro-warning").parent().addClass("hide");
+					}
+				});
+			}
+			resizeBodyEl();
+		}else{
+			$(".area .pro-warning").parent().removeClass("hide");
+			$(".area .pro-warning").text("您选择的产品当前没有可创建的服务，请重新选择。");
+		}
+	}
+}],["overviewDialog.addIP", function(params, el){
+	var serName = params.key;
+	$XD.setDataAttr($(".area .okbtn")[0], "serName", serName);
+	var areaEl = $XH.ancestor(el, "area");
+	var cBodyEL = $XH.first(areaEl, "container-body");
+	var cAdditionEL = $XH.first(areaEl, "container-addition");
+	$XH.removeClass(cBodyEL, "active");
+	$(".ixw-body .btns").addClass("hide");
+	$XH.addClass(cAdditionEL, "active");	
+	updateleftSideIPs(getUnSelectedIPs(), false);
+	var rightSideEl = $(".rightSide .ip-selected > ul");
+//	rightSideEl[0].innerHTML = t_selectedIpsContainer.renderData("", {
+//		selectedIps : IX.loop(Object.keys(ips), [], function(acc,ip){
+//			if(ips[ip].selected && ips[ip].serviceName === serName) acc.push({
+//				ip : ip
+//			});
+//			return acc;
+//		})
+//	});
+	rightSideEl.empty();
+	resizeBodyEl();
+}],["overviewDialog.ip.search", function(params, el){
+	var inputEl = $XD.first(el.parentNode, "input");
+	var value = inputEl.value;
+	var searchedIPs = [];
+	var ob = {};
+	$(".rightSide .ip-selected > ul li").each(function(index,item){
+		ob[$XD.dataAttr($(item).children("a")[0], "key")] = true;
+	});
+	IX.map(getUnSelectedIPs(), function(item){
+		if(value){
+				if(item.indexOf(value) > -1){
+				searchedIPs.push({
+					ip : item,
+					selected : ob[item] === "undefine" ? false : ob[item]
+				});
+			}
+		}else{
+			searchedIPs.push({
+				ip : item,
+				selected : ob[item] === "undefine" ? false : ob[item]
+			});
+		}
+	});
+	updateleftSideIPs(searchedIPs, true);
+}],["overviewDialog.ip.sure", function(params, el){
+	var key = params.key;
+	$(".area .container-body").addClass("active");
+	$(".area .container-addition").removeClass("active");
+	$(".area + .btns").removeClass("hide");
+	if(key === "ok"){
+		var serName = $XD.dataAttr(el, "serName");
+		var rightSideEl = $XH.ancestor(el, "rightSide");
+		IX.map($(rightSideEl).find("ul li"), function(item){
+			ips[item.id.split("-")[1]].selected = true;
+			ips[item.id.split("-")[1]].serviceName = serName;
+	});
+	var selectedIPs = IX.loop(Object.keys(ips), [], function(acc, ip) {
+		if(ips[ip].selected && ips[ip].serviceName === serName) acc.push(ip);
+		return acc;
+	});
+	$(".area .ipsAndHosts[data-name=\'" + serName + "\']")[0].innerHTML = t_addedIPsContainer.renderData("", {
+		addedIPs: IX.map(selectedIPs, function(item, index) {
+			var hostHTML = "";
+			hostHTML = dropdownBox.getHTML(IX.inherit(overviewCfg.host, {
+				id: "ovHost-" + index,
+				value: ips[item].host ? ips[item].host : "",
+				key : ips[item].host ? ips[item].host : ""
+			}), IX.loop(Object.keys(hosts), [], function(acc, host){
+				acc.push({
+					id : host,
+					name : "<span class='item-body'>"+ host +"</span><span class='item-prompt'>剩余 CPU " + 
+					hosts[host].cpu+" 核，内存 " + hosts[host].mem + " GB,硬盘(GB) " + hosts[host].disk+ " GB</span>",
+					title : host + "剩余 CPU "+hosts[host].cpu+" 核，内存 " +hosts[host].mem+" GB，硬盘 " +hosts[host].disk+" GB"
+				});
+				return acc;
+			}), "overviewDialog.choseHost");
+			return {
+				idNum: index,
+				num: index + 1,
+				value: item,
+				hostHTML: hostHTML
+			};
+		})
+	});
+	resizeBodyEl();
+}
+}], ["overviewDialog.choseHost", function(params, el){ //选择所属主机回调
+	$(el).parents(".dropdown").children(".dropdown-toggle").removeClass("requiredMark");
+	var par = $(el).parents(".contentRow");
+	var host = params.key;
+	var oldHost = $(el).parents(".dropdown").children("input.required").val();
+	var ip = par.prev().find(".value").text();
+	var warnEl = $(el).parents(".contentRow").children(".host-warning");
+	var pname = $("#ovProduct").val();
+	var vname = $("#ovVersion").val();
+	var sname = $XD.dataAttr($(el).parents("li").find(".addBtn")[0], "key");
+	var cost = serviceHT.get(pname+"-"+vname +"-"+sname); //所选服务所需资源
+	var remain = hosts[host]; //主机剩余资源配置
+	var specialSers = [proInfo[5].services[0], proInfo[7].services[0], proInfo[6].services[1], proInfo[6].services[2], proInfo[0].services[3]];
+	if(oldHost === host) return;
+	if(oldHost) revertHost(oldHost, el);
+	warnEl.text("");
+	if(specialSers.indexOf(sname) > -1){
+		if(hosts[host].serName === sname){ //页面上检测该host是否已部署特殊服务
+			sdvDialog.confirmAlert("提示","主机"+ host +"上已选择部署了"+ sname +"，本次操作可能会降低性能，是否继续？", function(){
+				updateHost();
+			}, function(){
+				par.find(".dropdown .required").val("");
+				par.find(".dropdown .value").text("");
+			});
+		}else{
+			caller("checkIsDeployed", {
+				product: pname,
+				version: vname,
+				service: sname,
+				host: host
+			}, function(data){
+				if(data.isDeployed){
+					if(sname === proInfo[5].services[0] || sname === proInfo[7].services[0]){
+						sdvDialog.alert("主机"+ host +"上已选择了部署"+ sname +"，请选择其他主机", function(){
+							par.find(".dropdown .required").val("");
+							par.find(".dropdown .value").text("");
+						});
+					}else{
+						sdvDialog.confirmAlert("提示","主机"+ host +"上已部署了"+ sname +"，本次操作可能会降低性能，是否继续？", function(){
+							updateHost();
+						}, function(){
+							par.find(".dropdown .required").val("");
+							par.find(".dropdown .value").text("");
+						});
+					}
+				}else{
+					updateHost();
+				}
+			});
+		}
+	}else{
+		updateHost();
+	}
+	$(".area .host.contentRow .dropdown-menu").html(t_hostItemsContainer.renderData("", {
+		repeat : IX.loop(Object.keys(hosts), [], function(acc, host){
+			acc.push({
+				host : host,
+				disk : hosts[host].disk,
+				mem : hosts[host].mem,
+				cpu : hosts[host].cpu
+			});
+			return acc;
+		})
+	}));
+
+	function updateHost(){
+		if(remain.cpu - cost.occupyCpu >= 0 && remain.disk - cost.disk >= 0 && remain.mem - cost.mem >= 0){
+			remain.cpu -= cost.occupyCpu;
+			remain.disk -= cost.disk;
+			remain.mem -= cost.mem;
+			ips[ip].host = host;
+			hosts[host].serName = sname;
+			par.find(".dropdown .required").val(host);
+			par.find(".dropdown .value").text(host);
+		}else{
+			par.find(".dropdown .required").val("");
+			par.find(".dropdown .value").text("");
+			warnEl.text("主机"+ host +" 资源不足，请选择其他主机");
+		}
+	}
+}],["overviewDialog.ip.delete", function(params, el){
+	var ip = params.key;
+	var ipsAndHosts = $(el).parents(".ipsAndHosts");
+	ips[ip].selected = false;
+	ips[ip].serviceName = "";
+	ips[ip].host = "";
+	var host = $(el).parent().next().find("input.required").val();
+	revertHost(host, el);
+	$(el).parent().next().remove();
+	$(el).parent().remove();
+	ipsAndHosts.children(".contentRow").not(".host").children(".label").each(function(index,item){
+		if($(item).text().split("（")[1].split("）")[0] != index + 1){
+			$(item).text("IP（"+ (index + 1) +"）");
+		}
+	});
+	resizeBodyEl();
+}]]);
+
+function ipSure(params, el) {
+	var key = params.key;
+	$(".area .container-body").addClass("active");
+	$(".area .container-addition").removeClass("active");
+	$(".area + .btns").removeClass("hide");
+	if(key === "ok") {
+		var serName = $XD.dataAttr(el, "serName");
+		var rightSideEl = $XH.ancestor(el, "rightSide");
+		IX.map($(rightSideEl).find("ul li"), function(item) {
+			ips[item.id.split("-")[1]].selected = true;
+			ips[item.id.split("-")[1]].serviceName = serName;
+		});
+		var selectedIPs = IX.loop(Object.keys(ips), [], function(acc, ip) {
+			if(ips[ip].selected && ips[ip].serviceName === serName) acc.push(ip);
+			return acc;
+		});
+		$(".area .ipsAndHosts[data-name=\'" + serName + "\']")[0].innerHTML = t_addedIPsContainer.renderData("", {
+			addedIPs: IX.map(selectedIPs, function(item, index) {
+				var hostHTML = "";
+				hostHTML = dropdownBox.getHTML(IX.inherit(overviewCfg.host, {
+					id: "ovHost-" + index,
+					value: ips[item].host ? ips[item].host : "",
+					key: ips[item].host ? ips[item].host : ""
+				}), IX.loop(Object.keys(hosts), [], function(acc, host) {
+					acc.push({
+						id: host,
+						name: "<span class='item-body'>" + host + "</span><span class='item-prompt'>剩余 CPU " +
+							hosts[host].cpu + " 核，内存 " + hosts[host].mem + " GB,硬盘(GB) " + hosts[host].disk + " GB</span>",
+						title: host + "剩余 CPU " + hosts[host].cpu + " 核，内存 " + hosts[host].mem + " GB，硬盘 " + hosts[host].disk + " GB"
+					});
+					return acc;
+				}), "overviewDialog.choseHost");
+				return {
+					idNum: index,
+					num: index + 1,
+					value: item,
+					hostHTML: hostHTML
+				};
+			})
+		});
+	}
+	resizeBodyEl();
+}
+
+function revertHost(oldHost, el) {//删除IP时还原主机资源
+	var pname = $("#ovProduct").val();
+	var vname = $("#ovVersion").val();
+	var sname = $XD.dataAttr($(el).parents("li").find(".addBtn")[0], "key");
+	var cost = serviceHT.get(pname+"-"+vname +"-"+sname); //所选服务所需资源
+	if(oldHost){
+		hosts[oldHost].cpu += cost.occupyCpu;
+		hosts[oldHost].disk += cost.disk;
+		hosts[oldHost].mem += cost.mem;
+		hosts[oldHost].serName = "";
+	}
+}
+function updateleftSideIPs(ips, isSearch) {
+	var leftSideEl = $("#ip-box")[0];
+	if(isSearch){
+			leftSideEl.innerHTML = t_ipsContainer.renderData("", {
+			availIps : IX.map(ips, function(item){
+				return {
+					value : item.ip,
+					selected : item.selected ? "selected" : ""
+				};
+			})
+		});
+	}else{
+			leftSideEl.innerHTML = t_ipsContainer.renderData("", {
+			availIps : IX.map(ips, function(item){
+				return {
+					value : item
+				};
+			})
+		});
+	}
+}
+function getUnSelectedIPs(){
+	return IX.loop(Object.keys(ips), [], function(acc,ip){
+		if(!ips[ip].selected) acc.push(ip);
+		return acc;
+	});
+}
+function resizeBodyEl(){
+	var bodyEl = $("#nv-dialog .ixw-body")[0];
+	var containerBodyEl = $(bodyEl).find(".container-body");
+	var areaEl = $(bodyEl).find(".area");
+	if(containerBodyEl.height() > 500 && !$(".ixw-body .container-addition").hasClass("active")){
+		areaEl.height(500);
+		areaEl.css("overflow","auto");
+	}else{
+		areaEl.height("auto");
+		areaEl.css("overflow","visible");
+	}
+	var posY = ($Xw.getScreen().size[1]- bodyEl.offsetHeight)/2;
+	posY = posY > 300? (posY-100): Math.max(posY, 0);
+	bodyEl.style.marginTop = (0- bodyEl.offsetHeight- posY) + "px";
+}
+function getAvailList(data){
+	var availRsrcs = IX.map(data, function(item){
+		var name = $XP(item, "name", "");
+		var id = $XP(item, "id", name);
+		return {
+			title : name,
+			key : id,
+			html : name
+		};
+	});
+	return t_availRsrcsContainer.renderData("", {
+		availRsrcs : availRsrcs
+	});
+}
+function getSepratedData(info){
+	var productInfo = $XP(info, "product", []);
+	productHT.clear();
+	versionHT.clear();
+	serviceHT.clear();
+	IX.map(productInfo, function(item, idx){
+		var pname = $XP(item, "name", idx);
+		var version = $XP(item, "version", []);
+		productHT.register(pname, version);
+		IX.map(version, function(item, idx){
+			var vname = $XP(item, "name", idx);
+			var service = $XP(item, "service", []);
+			versionHT.register(pname+"-"+vname, service);
+			IX.map(service, function(item, idx){
+				var sname = $XP(item, "name", idx);
+				var cfg = $XP(item, "rscConfig", {});
+				serviceHT.register(pname+"-"+vname +"-"+sname, {
+					occupyCpu : $XP(cfg, "occupyCpu", ""),
+					virtualCpu : $XP(cfg, "virtualCpu", ""),
+					mem : $XP(cfg, "mem", ""),
+					disk : $XP(cfg, "disk", "")
+				});
+			});
+		});
+	});
+}
+function vertifyRequired(){
+	var flag = true;
+	IX.map($(".area input.required"), function(el){
+		if(el.value === ""){
+			flag = false;
+		}
+		var lastEl = el;
+		if($XH.hasClass(el.parentNode, "dropdown")){
+			lastEl = $XH.first(el.parentNode, "dropdown-toggle");
+		}
+		$XH[el.value === "" ? "addClass" : "removeClass"](lastEl, "requiredMark");
+	});
+	IX.map($(".area input.numLimit"), function(el){
+		if($XH.hasClass(el, "morelimit")) flag = false;
+	});
+	IX.map($(".area .services > li"), function(el){
+		if(!$(el).children(".ipsAndHosts").children().length) flag = false;
+	});
+	if($(".area .services > li").length === 0) flag = false;
+	return flag;
+}
+function submitProduct(okFn, btndisableFn){
+	var flag = vertifyRequired();
+	if(flag){
+		if(IX.isFn(btndisableFn)) btndisableFn();
+		var product, version, service = [];
+		product = $X('ovProduct').value;
+		version = $X('ovVersion').value;
+		var ob = {};
+		IX.map(Object.keys(ips), function(item){
+			if(ips[item].selected){
+				if(ob[ips[item].serviceName]){
+					ob[ips[item].serviceName].push({
+						ip : item,
+						host : ips[item].host
+					});
+				}else{
+					ob[ips[item].serviceName] = [{
+						ip : item,
+						host : ips[item].host
+					}];
+				}
+			}
+		});
+		IX.map(Object.keys(ob), function(item){
+			var config = serviceHT.get(product+"-"+version +"-"+item);
+			service.push({
+				name : item,
+				ipsAndHosts : ob[item],
+				rscConfig : 0,
+				occupyCpu : config.occupyCpu,
+				virtualCpu : config.virtualCpu,
+				mem : config.mem,
+				disk : config.disk
+			});
+		});
+		var productInfo = {
+			product : product,
+			version : version,
+			service : service
+		};
+		okFn(productInfo);
+	}
+}
+IX.ns("SDV.overviewDialog");
+SDV.overviewDialog.addProduct = function(serviceAttr,okFn){
+	caller("getInfo4AddServie", {
+		serviceAttr : serviceAttr
+	}, function(info){
+		getSepratedData(info);
+		var ipBox = SDV.addIpBox.ipBox({
+			ips : [],
+			sureFn : ipSure,
+			search : "overviewDialog.ip.search"
+		});
+		IX.map(info.host, function(host){
+			hosts[host.hostIp] = {
+				cpu : host.cpu,
+				mem : host.mem,
+				disk : host.disk,
+				serName : ""
+			};
+		});
+		IX.map(info.ip, function(ip){
+			ips[ip] = {
+				selected : false,
+				serviceName : "",
+				host : ""
+			};
+		});
+		showDialog({
+			title : "新建产品",
+			content : t_addProduct.renderData("", {
+				productHTML: dropdownBox.getHTML(overviewCfg.product, info.product, "overviewDialog.chose"),
+				versionHTML: dropdownBox.getHTML(overviewCfg.version, []),
+				additionHTML: ipBox.getHTML()
+			}),
+			okFn : function(cbFn, btndisableFn){submitProduct(okFn, btndisableFn);},
+			bindOn : function(areaEl){
+				var dropdowns = null;
+				dropdowns = $(areaEl).find(".dropdown input.required");
+				IX.map(dropdowns, function(el){
+					dropdownBox.bindonDropdown(el);
+				});
+			}
+		});
+		$(".container-body ul.services").on("click", "button.dropdown-toggle", function(event){
+			var el = event.target;
+			var dropdown = $(el).parents(".dropdown");
+			var bottom;
+			var areaEl = $(".ixw-body .area");
+			if(areaEl.css("overflow") === "auto"){
+				dropdown.children(".dropdown-menu ").removeClass("dropdownUp");
+				setTimeout(function(){
+					areaEl.scrollTop(dropdown.parent().position().top + 10);
+				},50);
+			}else{
+				bottom = $(window).height() - (dropdown.height() + dropdown.offset().top);
+				if(bottom < 300) dropdown.children(".dropdown-menu ").addClass("dropdownUp");
+				else dropdown.children(".dropdown-menu ").removeClass("dropdownUp");
+			}
+		});
+	});
+};
+</script>
